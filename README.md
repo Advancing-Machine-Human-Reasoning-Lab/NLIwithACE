@@ -17,7 +17,7 @@ If this last line gives sql errors, open setup.py and look for the sql dependenc
 3. Install SWI-Prolog: https://www.swi-prolog.org/
 4. Download the Attempto parsing engine (https://github.com/Attempto/APE) and install it using the instructions on that page. Make note of the directory into which you download this engine, and edit "ape.py" to point to it.
 5. Download the Clex lexicon, clex_lexicon.pl (https://github.com/Attempto/Clex). Put this file in the same directory as ape.exe.
-6. Download the StanfordNLP library (https://stanfordnlp.github.io/stanfordnlp/). Don't forget to do the one-time download using `stanfordnlp.download('en')`, as in the directions on that page.
+6. Download the StanfordNLP library (https://stanfordnlp.github.io/stanfordnlp/). Don't forget to do the one-time download using `stanfordnlp.download('en')`, as per the directions on that page.
 
 ## Example Usage
 
