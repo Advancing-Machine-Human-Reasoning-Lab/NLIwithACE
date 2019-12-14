@@ -11,6 +11,7 @@ git clone -b development https://github.com/clips/pattern
 cd pattern
 sudo python3.6 setup.py install
 ```
+Might be a good idea to rename the 'pattern' folder to something else like 'pattern_library', or it seems to confuse the python module importer.
 
 If this last line gives sql errors, open setup.py and look for the sql dependency, and remove it. Then run the above line again.
 
