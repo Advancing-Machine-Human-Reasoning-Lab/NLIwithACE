@@ -4,6 +4,7 @@ This file contains code to work with rewrite rules: rules that take a natural la
 Author: John Licato, licato@usf.edu
 """
 from FOL_resolution import parseExpression, propStructToSExp
+import sys
 from pattern.en import conjugate, pluralize, singularize
 from wordnet_utils import findHypernym, findHypernym_onedir
 """To install pattern:
@@ -13,7 +14,7 @@ sudo python3.6 setup.py install
 If it gives sql errors, remove the dependency in setup.py.
 https://www.clips.uantwerpen.be/pages/pattern-en"""
 import stanfordnlp
-import sys, traceback
+import traceback
 
 #converts a constituency tree formatted as S-expression into a nested list structure.
 def parseConstituency(s):
