@@ -131,8 +131,10 @@ def R1(T, snlp=None):
 	else:
 		return [0,T_original]
 
-"""Replace `he/him' with `p:DMale' ('p:' identifies pronouns in APE) and `his' with `p:DMale's,' `she/her/hers' with `p:DFemale/p:DFemale's,' and `they/them/theirs' with `p:DGroup/p:DGroup's.' This is a weak form of coreference resolution; e.g., we essentially assume that whenever the premise and hypothesis use `he,' they are referring to the same person."""
-def R2(T, snlp=None):
+"""This is the version of R2 that was used in the FLAIRS 2020 paper. It is very problematic, and has been replaced.
+
+Replace `he/him' with `p:DMale' ('p:' identifies pronouns in APE) and `his' with `p:DMale's,' `she/her/hers' with `p:DFemale/p:DFemale's,' and `they/them/theirs' with `p:DGroup/p:DGroup's.' This is a weak form of coreference resolution; e.g., we essentially assume that whenever the premise and hypothesis use `he,' they are referring to the same person."""
+def R2_OLD(T, snlp=None):
 	if isinstance(T, str):
 		toReplace = ['he', 'him', 'his', 'she', 'her', 'hers', 'they', 'them', 'their']
 		replaceWith = ['p:dmale', 'p:dmale', "p:dmale's", 'p:dfemale', "p:dfemale's", "p:dfemale's", 'p:dgroup', 'p:dgroup', "p:dgroup's"]
@@ -142,6 +144,71 @@ def R2(T, snlp=None):
 				toReturn = toReturn[0:2] + toReturn[2].upper() + toReturn[3:]
 			return [1, toReturn]
 	return [0, T]
+
+
+from coref_resolution import * #comment this out if not using R2
+"""New version of R2. This uses coreference resolution to find chains of coreferences, and then iteratively remove all pronominals.
+You must make sure that the stanfordnlp server is running at localhost:9000.
+This is NOT a recursive rule; if calling with applyRule(), use recursive=False.
+"""
+def R2(T, snlp):
+	#first, go through and attach an index to each root node tag (so the list ['DT', 'the'], not the string 'the')
+	allRootLists = []
+	toCheck = [T]
+	while len(toCheck)>0:
+		curr = toCheck.pop(0)
+		if isinstance(curr,str) or len(curr)<2:
+			raise Exception("Unsure how to parse subtree:", curr)
+		if isinstance(curr[1], str):
+			allRootLists.append(curr)
+		else:
+			toCheck += curr[1:]:
+	#next, contact the server to calculate coreference resolution
+	flatSentence = getWordSequence(T)
+	with CoreNLPClient(endpoint="http://localhost:9000") as client:
+		crc = getCrc(flatSentence, client)
+		chains = [parseCrc(str(chain)) for chain in crc]
+	
+	for (chainIndex, chain) in enumerate(chains):
+		#find out what the name of this chain should be. Does it have any proper nouns?
+		proper_links = [link for link in chain if link['mentionType']=='PROPER']
+		propers = []
+		for link in proper_links:
+			if link['sentenceIndex']>0:
+				raise Exception("There was more than one sentence here, don't know how to handle it:" + flatSentence)
+			words = [allRootLists[i][1] for i in range(link['beginIndex'], link['endIndex'])]
+			propers.append('_'.join(words))
+		if len(propers)>0:
+			chainName = 'p:' + propers[0]
+			if len(propers)>1:
+				#TODO: for every pair p,q in propers, add sentence (P1 is P2 and P2 is P1). 
+			#TODO: replace all instances of proper nouns (even multi-word ones) with chainName
+		else:# len(propers)==0:
+			chainName = 'p:DefaultName' + str(chainIndex)
+		#now we know the chain's proper name, and there should be no other proper nouns.
+		#next, find all pronominals, and replace them.
+
+# For each chain found by coref:
+# * For each chain:
+#     * If chain has exactly one PROPER:
+#         * make it the name (replace spaces with '_').
+#     * if it has more than one PROPER:
+#         * choose one to make the name, and for the rest add sentences (P1 is P2, and P2 is P1.)
+#     * else (no PROPER):
+#         * assign default name based on group
+#     * Assert: the group name is assigned
+#     * Replace all single-word PRONOMINALs with name, name + ‘s if possessive. If more than one word, exception. 
+#     * If there is a multi-word PRONOMINAL, generate exception
+# * For each chain:
+#     * Replace all multi-word NOMINALs with name, and add “[name] is [multi-word nominal]”. 
+# * For each chain:
+#     * Replace all LISTs with name, if the list was subject of a verb, make the verb singular. Add “[list] are in [name]”.
+# For each word:
+# * If a PRONOMINAL is found, assume it is alone and replace it with a unique name
+
+
+
+
 
 nextIndex = 0
 """Replace past tense verbs (VBD/VBN) with present tense, using pattern.en. (https://www.clips.uantwerpen.be/pages/pattern)
