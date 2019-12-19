@@ -147,6 +147,8 @@ def R2_OLD(T, snlp=None):
 
 
 from coref_resolution import * #comment this out if not using R2
+import warnings
+warnings.filterwarnings("ignore") #comment this out if you want to see warnings
 """New version of R2. This uses coreference resolution to find chains of coreferences, and then iteratively remove all pronominals.
 You must make sure that the stanfordnlp server is running at http://localhost:9000.
 DO NOT CALL THIS USING APPLYRULE()! This rule operates differently from the others: it must be called individually, and does NOT return a constituency parse tree like it is passed. 
@@ -159,10 +161,10 @@ def R2(T):
 	#first, go through and attach an index to each root node tag (so the list ['DT', 'the'], not the string 'the')
 	outputSentence = []
 	toCheck = [T]
-# 	print("INPUT:", T)
+	# print("INPUT:", T)
 	while len(toCheck)>0:
-# 		print(toCheck)
-# 		input()
+		# print(toCheck)
+		# input()
 		curr = toCheck.pop(0)
 		if isinstance(curr[1], str):
 			outputSentence.append(curr[1])
@@ -182,7 +184,7 @@ def R2(T):
 	with CoreNLPClient(endpoint="http://localhost:9000") as client:
 		crc = getCrc(flatSentence, client)
 		chains = [parseCrc(str(chain)) for chain in crc]
-		print(chains)
+		# print(chains)
 		updateHistory('start')
 	
 	chainNames = []
@@ -236,23 +238,10 @@ def R2(T):
 			#add sentence
 			outputSentence += [chainName, 'is'] + nominal + ['.']
 			updateHistory("removed nominal")
-
-
-
-# * For each chain:
-#     * Replace all multi-word NOMINALs with name, and add “[name] is [multi-word nominal]”. 
-# For each word:
-# * If a PRONOMINAL is found, assume it is alone and replace it with a unique name		
-		
-	if len(sentenceHistory)>1:
-		sentenceHistory = [s[0] + '\t\t' + s[1] for s in sentenceHistory]
-		print('\n\t'.join(["SENTENCE HISTORY"] + sentenceHistory))
-
-#WHEN DONE:
-#	return ['DUMMY_TREE'] + [['WORD', w] for w in outputSentence if w!=None]
-
-
-
+	# if len(sentenceHistory)>1:
+	# 	sentenceHistory = [s[0] + '\t\t' + s[1] for s in sentenceHistory]
+	# 	print('\n\t'.join(["SENTENCE HISTORY"] + sentenceHistory))
+	return ['DUMMY_TREE'] + [['WORD', w] for w in outputSentence if w!=None]
 
 
 nextIndex = 0
@@ -401,6 +390,22 @@ def R8(T, snlp=None):
 			for c in T[2][2:]:
 				toReturn.append(c)
 			return [1, toReturn]
+	return [0,T]
+
+
+"""Wasn't in original FLAIRS submission. If a sentence has a single NP at its root, then insert "There is" in the beginning.
+Currently doesn't account for plural nouns or lists.
+(ROOT (NP xxx)) ==> (ROOT (S (NP (EX There) (VP (VBZ is) (NP xxx))))) 
+
+This is NOT a recursive rule; if calling with applyRule(), use recursive=False.
+"""
+def R9(T, snlp=None):
+	if T[0]=='ROOT' and len(T)==2 and isinstance(T[1], list) and T[1][0]=='NP':
+		original = T[1]
+		if isinstance(original[1], list) and original[1][0]=='NP' and isinstance(original[1][1], list) and original[1][1][0]=='DT':
+			original[1][1][1] = original[1][1][1].lower()
+		newT = ['ROOT', ['S', ['NP', ['EX', 'There'], ['VP', ['VBZ', 'is'], original]]]]
+		return [1,newT]
 	return [0,T]
 
 #given a dictionary of hyperyms, returns all possible transformations
@@ -652,35 +657,41 @@ def S2_old(Tp, Th):
 
 
 if __name__=="__main__":
-	s = "People talk to themselves"
-	C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
-	# print(C)
-	R2(C)
+	s = "(ROOT (NP (NP (DT A) (NN mom) (CC and) (NN son)) (VP (VBG enjoying) (NP (NP (DT a) (NN day)) (PP (IN in) (NP (DT the) (NN park))))) (. .)))"
+	print(R9(parseConstituency(s)))
 
-	s = "John loves his wife and she is laughing at him"
-	C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
-	# print(C)
-	R2(C)
+	s = "(ROOT (S (NP (NP (DT A) (NN guy)) (PP (IN on) (NP (DT a) (NN skateboard)))) (, ,) (VP (VBG jumping) (PRT (RP off)) (NP (DT some) (NNS steps))) (. .)))"
+	print(R9(parseConstituency(s)))
 
-	s = "A boy and a girl play in his yard and she laughs"
-	C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
-	# print(C)
-	R2(C)
-	exit()
+	# s = "People talk to themselves"
+	# C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
+	# # print(C)
+	# R2(C)
 
-	SNLI_LOCATION = "snli/snli_1.0_dev.txt"
-	with open(SNLI_LOCATION, 'r') as F:
-		allLines = [l.strip().split('\t') for l in F.readlines()[1:]]
-	for (i,line) in enumerate(allLines):
-		if i%100==0:
-			print(i, "of", len(allLines))
-		for S in [line[3], line[4]]:
-			#clean them up for punctuation and shit
-			for punct in ['(. ,)', '(. .)', '(. !)']:
-				S = S.replace(punct, '')
-			S = S.replace('.', '')
-			try:
-				T = parseConstituency(S)
-			except:
-				continue
-			R2(T)
+	# s = "John loves his wife and she is laughing at him"
+	# C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
+	# # print(C)
+	# R2(C)
+
+	# s = "A boy and a girl play in his yard and she laughs"
+	# C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
+	# # print(C)
+	# R2(C)
+	# exit()
+
+	# SNLI_LOCATION = "snli/snli_1.0_dev.txt"
+	# with open(SNLI_LOCATION, 'r') as F:
+	# 	allLines = [l.strip().split('\t') for l in F.readlines()[1:]]
+	# for (i,line) in enumerate(allLines):
+	# 	if i%100==0:
+	# 		print(i, "of", len(allLines))
+	# 	for S in [line[3], line[4]]:
+	# 		#clean them up for punctuation and shit
+	# 		for punct in ['(. ,)', '(. .)', '(. !)']:
+	# 			S = S.replace(punct, '')
+	# 		S = S.replace('.', '')
+	# 		try:
+	# 			T = parseConstituency(S)
+	# 		except:
+	# 			continue
+	# 		R2(T)
