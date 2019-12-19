@@ -170,18 +170,22 @@ def R2(T):
 			raise Exception("Unsure how to parse subtree:", curr)
 		else:
 			toCheck = curr[1:] + toCheck
+	if outputSentence[-1].strip() != ".":
+		outputSentence.append(".")
 	#next, contact the server to calculate coreference resolution
 	flatSentence = treeToACEInput(T)
 	sentenceHistory = []
-	def updateHistory():
-		st = ' '.join(outputSentence)
-		if len(sentenceHistory)==0 or st != sentenceHistory[-1]:
-			sentenceHistory.append(st)
+	def updateHistory(step):
+		st = ' '.join([w for w in outputSentence if w!=None])
+		if len(sentenceHistory)==0 or st != sentenceHistory[-1][0]:
+			sentenceHistory.append([st, step])
 	with CoreNLPClient(endpoint="http://localhost:9000") as client:
 		crc = getCrc(flatSentence, client)
 		chains = [parseCrc(str(chain)) for chain in crc]
-		updateHistory()
+		print(chains)
+		updateHistory('start')
 	
+	chainNames = []
 	for (chainIndex, chain) in enumerate(chains):
 		#find out what the name of this chain should be. Does it have any proper nouns?
 		proper_links = [link for link in chain if link['mentionType']=='PROPER']
@@ -200,9 +204,10 @@ def R2(T):
 					outputSentence[i] = None
 		else:# len(propers)==0:
 			chainName = 'p:DefaultName' + str(chainIndex)
-		updateHistory()
+		updateHistory('removed propers')
+		chainNames.append(chainName)
 		#now we know the chain's proper name, and there should be no other proper nouns.
-		#TODO: next, find all pronominals, and replace them with name, name + ‘s if possessive. If pronominal has more than one word, exception. 
+		#next, find all pronominals, and replace them with name, name + ‘s if possessive. If pronominal has more than one word, exception. 
 		pronominal_links = [link for link in chain if link['mentionType']=='PRONOMINAL']
 		for link in pronominal_links:
 			if link['sentenceIndex']>0:
@@ -214,16 +219,34 @@ def R2(T):
 				outputSentence[link['beginIndex']] = chainName + "'s"
 			else:
 				outputSentence[link['beginIndex']] = chainName
-			updateHistory()
+			updateHistory('removed pronominals')
+	for (chainIndex, chain) in enumerate(chains):
+		chainName = chainNames[chainIndex]
+		#Replace all multi-word nominals with the name, add "[name] is [nominal]" to there.
+		nominal_links = [link for link in chain if link['mentionType']=='NOMINAL' and link['number']!='PLURAL']
+		for link in nominal_links:
+			if link['sentenceIndex']>0:
+				raise Exception("There was more than one sentence here, don't know how to handle it:" + flatSentence)
+			nominal = [outputSentence[i] for i in range(link['beginIndex'], link['endIndex'])]
+			nominal[0] = nominal[0].lower()
+			#replace
+			outputSentence[link['beginIndex']] = chainName
+			for i in range(link['beginIndex'] + 1, link['endIndex']):
+				outputSentence[i] = None
+			#add sentence
+			outputSentence += [chainName, 'is'] + nominal + ['.']
+			updateHistory("removed nominal")
+
+
+
 # * For each chain:
 #     * Replace all multi-word NOMINALs with name, and add “[name] is [multi-word nominal]”. 
-# * For each chain:
-#     * Replace all LISTs with name, if the list was subject of a verb, make the verb singular. Add “[list] are in [name]”.
 # For each word:
 # * If a PRONOMINAL is found, assume it is alone and replace it with a unique name		
 		
-		if len(sentenceHistory)>1:
-			print('\n\t'.join(["SENTENCE HISTORY"] + sentenceHistory))
+	if len(sentenceHistory)>1:
+		sentenceHistory = [s[0] + '\t\t' + s[1] for s in sentenceHistory]
+		print('\n\t'.join(["SENTENCE HISTORY"] + sentenceHistory))
 
 #WHEN DONE:
 #	return ['DUMMY_TREE'] + [['WORD', w] for w in outputSentence if w!=None]
@@ -422,16 +445,16 @@ def S1(Tp, Th):
 	POS_tags = ['NN','NNS','NNP','NNPS']
 	premiseNouns = getWordsByPOS(Tp, POS_tags) 
 	hypNouns = getWordsByPOS(Th, POS_tags) 
-# 	print(premiseNouns)
-# 	print(hypNouns)
+	# print(premiseNouns)
+	# print(hypNouns)
 	#get all nouns in their singular forms
 	toConvert = dict()
 	allNouns = set()
 	for PN in premiseNouns + hypNouns:
 		if len(PN)!=2:
 			print("ERROR: in S1(), an unexpected value in premiseNouns+hypNouns:", PN)
-# 			print("Tp:", Tp)
-# 			print("Th:", Th)
+			# print("Tp:", Tp)
+			# print("Th:", Th)
 			continue
 		[pos,n] = PN
 		if n[:2]=='n:':
@@ -492,8 +515,8 @@ def S1_old(Tp, Th):
 	POS_tags = ['NN','NNS','NNP','NNPS']
 	premiseNouns = getWordsByPOS(Tp, POS_tags) 
 	hypNouns = getWordsByPOS(Th, POS_tags) 
-# 	print(premiseNouns)
-# 	print(hypNouns)
+	# print(premiseNouns)
+	# print(hypNouns)
 	#for each pair, if one is a hypernym of the other, then replace all instances of it,
 	#being careful to preserve plurality
 	toConvert = dict()
@@ -512,10 +535,10 @@ def S1_old(Tp, Th):
 			if pn==hn:
 				continue
 			result = findHypernym_onedir(pn,hn,'n')
-# 			print("Comparing:", pn, hn)
+			# print("Comparing:", pn, hn)
 			if not result:
 				continue
-# 			print("Found hypernym:", pn, hn)
+			# print("Found hypernym:", pn, hn)
 			#convert all instances of pn to hn, both singular and plural versions
 			plural = [pluralize(pn), pluralize(hn)]
 			singular = [pn, hn]
@@ -557,7 +580,7 @@ def S1_old(Tp, Th):
 								raise Exception("w2 and w3 were equal! %s, %s, %s" % (w2,w3,H))
 				else:
 					toConvert[w1] = w2
-# 	print("full dict:", toConvert)
+	# print("full dict:", toConvert)
 	#go through Tp and Th, and convert all instances as toConvert commands
 	return replaceIn(Tp,toConvert)
 
@@ -629,6 +652,22 @@ def S2_old(Tp, Th):
 
 
 if __name__=="__main__":
+	s = "People talk to themselves"
+	C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
+	# print(C)
+	R2(C)
+
+	s = "John loves his wife and she is laughing at him"
+	C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
+	# print(C)
+	R2(C)
+
+	s = "A boy and a girl play in his yard and she laughs"
+	C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
+	# print(C)
+	R2(C)
+	exit()
+
 	SNLI_LOCATION = "snli/snli_1.0_dev.txt"
 	with open(SNLI_LOCATION, 'r') as F:
 		allLines = [l.strip().split('\t') for l in F.readlines()[1:]]
