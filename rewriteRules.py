@@ -148,26 +148,39 @@ def R2_OLD(T, snlp=None):
 
 from coref_resolution import * #comment this out if not using R2
 """New version of R2. This uses coreference resolution to find chains of coreferences, and then iteratively remove all pronominals.
-You must make sure that the stanfordnlp server is running at localhost:9000.
-This is NOT a recursive rule; if calling with applyRule(), use recursive=False.
+You must make sure that the stanfordnlp server is running at http://localhost:9000.
+DO NOT CALL THIS USING APPLYRULE()! This rule operates differently from the others: it must be called individually, and does NOT return a constituency parse tree like it is passed. 
+Instead, it returns a dummy tree ['DUMMY_TREE', ['WORD', 'w1'], ['WORD', 'w2'], ...] simpy so that you can call treeToACEInput() with it.
+Thus, it is best to call this rule last.
+
+If this keeps outputting the "Starting Server with command..." line, go to (your virtualenv installation)/lib/python3.6/site-packages/stanfordnlp/server/client.py and comment out the print statement on line 118.
 """
-def R2(T, snlp):
+def R2(T):
 	#first, go through and attach an index to each root node tag (so the list ['DT', 'the'], not the string 'the')
-	allRootLists = []
+	outputSentence = []
 	toCheck = [T]
+# 	print("INPUT:", T)
 	while len(toCheck)>0:
+# 		print(toCheck)
+# 		input()
 		curr = toCheck.pop(0)
-		if isinstance(curr,str) or len(curr)<2:
-			raise Exception("Unsure how to parse subtree:", curr)
 		if isinstance(curr[1], str):
-			allRootLists.append(curr)
+			outputSentence.append(curr[1])
+		elif isinstance(curr,str):
+			raise Exception("Unsure how to parse subtree:", curr)
 		else:
-			toCheck += curr[1:]:
+			toCheck = curr[1:] + toCheck
 	#next, contact the server to calculate coreference resolution
-	flatSentence = getWordSequence(T)
+	flatSentence = treeToACEInput(T)
+	sentenceHistory = []
+	def updateHistory():
+		st = ' '.join(outputSentence)
+		if len(sentenceHistory)==0 or st != sentenceHistory[-1]:
+			sentenceHistory.append(st)
 	with CoreNLPClient(endpoint="http://localhost:9000") as client:
 		crc = getCrc(flatSentence, client)
 		chains = [parseCrc(str(chain)) for chain in crc]
+		updateHistory()
 	
 	for (chainIndex, chain) in enumerate(chains):
 		#find out what the name of this chain should be. Does it have any proper nouns?
@@ -176,35 +189,44 @@ def R2(T, snlp):
 		for link in proper_links:
 			if link['sentenceIndex']>0:
 				raise Exception("There was more than one sentence here, don't know how to handle it:" + flatSentence)
-			words = [allRootLists[i][1] for i in range(link['beginIndex'], link['endIndex'])]
+			words = [outputSentence[i] for i in range(link['beginIndex'], link['endIndex'])]
 			propers.append('_'.join(words))
 		if len(propers)>0:
 			chainName = 'p:' + propers[0]
-			if len(propers)>1:
-				#TODO: for every pair p,q in propers, add sentence (P1 is P2 and P2 is P1). 
-			#TODO: replace all instances of proper nouns (even multi-word ones) with chainName
+			#replace all instances of proper nouns (even multi-word ones) with chainName
+			for link in proper_links:
+				outputSentence[link['beginIndex']] = chainName
+				for i in range(link['beginIndex']+1, link['endIndex']):
+					outputSentence[i] = None
 		else:# len(propers)==0:
 			chainName = 'p:DefaultName' + str(chainIndex)
+		updateHistory()
 		#now we know the chain's proper name, and there should be no other proper nouns.
-		#next, find all pronominals, and replace them.
-
-# For each chain found by coref:
-# * For each chain:
-#     * If chain has exactly one PROPER:
-#         * make it the name (replace spaces with '_').
-#     * if it has more than one PROPER:
-#         * choose one to make the name, and for the rest add sentences (P1 is P2, and P2 is P1.)
-#     * else (no PROPER):
-#         * assign default name based on group
-#     * Assert: the group name is assigned
-#     * Replace all single-word PRONOMINALs with name, name + ‘s if possessive. If more than one word, exception. 
-#     * If there is a multi-word PRONOMINAL, generate exception
+		#TODO: next, find all pronominals, and replace them with name, name + ‘s if possessive. If pronominal has more than one word, exception. 
+		pronominal_links = [link for link in chain if link['mentionType']=='PRONOMINAL']
+		for link in pronominal_links:
+			if link['sentenceIndex']>0:
+				raise Exception("There was more than one sentence here, don't know how to handle it:" + flatSentence)
+			if link['endIndex'] - link['beginIndex'] > 1:
+				raise Exception("A pronominal with more than one word was found! Don't know what to do!")
+			possessive = ['my', 'our', 'your', 'his', 'her', 'its', 'their', 'mine', 'ours', 'yours', 'hers', 'theirs']
+			if outputSentence[link['beginIndex']].lower() in possessive:
+				outputSentence[link['beginIndex']] = chainName + "'s"
+			else:
+				outputSentence[link['beginIndex']] = chainName
+			updateHistory()
 # * For each chain:
 #     * Replace all multi-word NOMINALs with name, and add “[name] is [multi-word nominal]”. 
 # * For each chain:
 #     * Replace all LISTs with name, if the list was subject of a verb, make the verb singular. Add “[list] are in [name]”.
 # For each word:
-# * If a PRONOMINAL is found, assume it is alone and replace it with a unique name
+# * If a PRONOMINAL is found, assume it is alone and replace it with a unique name		
+		
+		if len(sentenceHistory)>1:
+			print('\n\t'.join(["SENTENCE HISTORY"] + sentenceHistory))
+
+#WHEN DONE:
+#	return ['DUMMY_TREE'] + [['WORD', w] for w in outputSentence if w!=None]
 
 
 
@@ -607,4 +629,19 @@ def S2_old(Tp, Th):
 
 
 if __name__=="__main__":
-	pass
+	SNLI_LOCATION = "snli/snli_1.0_dev.txt"
+	with open(SNLI_LOCATION, 'r') as F:
+		allLines = [l.strip().split('\t') for l in F.readlines()[1:]]
+	for (i,line) in enumerate(allLines):
+		if i%100==0:
+			print(i, "of", len(allLines))
+		for S in [line[3], line[4]]:
+			#clean them up for punctuation and shit
+			for punct in ['(. ,)', '(. .)', '(. !)']:
+				S = S.replace(punct, '')
+			S = S.replace('.', '')
+			try:
+				T = parseConstituency(S)
+			except:
+				continue
+			R2(T)
