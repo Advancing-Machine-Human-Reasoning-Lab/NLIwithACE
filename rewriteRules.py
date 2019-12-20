@@ -15,6 +15,7 @@ If it gives sql errors, remove the dependency in setup.py.
 https://www.clips.uantwerpen.be/pages/pattern-en"""
 import stanfordnlp
 import traceback
+import copy
 
 #converts a constituency tree formatted as S-expression into a nested list structure.
 def parseConstituency(s):
@@ -157,9 +158,10 @@ Thus, it is best to call this rule last.
 
 If this keeps outputting the "Starting Server with command..." line, go to (your virtualenv installation)/lib/python3.6/site-packages/stanfordnlp/server/client.py and comment out the print statement on line 118.
 """
-def R2(T, returnDummy=True):
+def R2(T, snlp=None):
 	#first, go through and attach an index to each root node tag (so the list ['DT', 'the'], not the string 'the')
 	outputSentence = []
+	T_backup = copy.deepcopy(T)
 	toCheck = [T]
 	# print("INPUT:", T)
 	while len(toCheck)>0:
@@ -186,6 +188,8 @@ def R2(T, returnDummy=True):
 		chains = [parseCrc(str(chain)) for chain in crc]
 		# print(chains)
 		updateHistory('start')
+	if len(chains)==0:
+		return [0, T_backup]
 	
 	chainNames = []
 	for (chainIndex, chain) in enumerate(chains):
@@ -241,10 +245,29 @@ def R2(T, returnDummy=True):
 	# if len(sentenceHistory)>1:
 	# 	sentenceHistory = [s[0] + '\t\t' + s[1] for s in sentenceHistory]
 	# 	print('\n\t'.join(["SENTENCE HISTORY"] + sentenceHistory))
-	if returnDummy:
-		return ['DUMMY_TREE'] + [['WORD', w] for w in outputSentence if w!=None]
-	else:
-		return ' '.join([w for w in outputSentence if w!=None])
+	#turn it into a string, then get new constituency parse:
+	with CoreNLPClient(endpoint="http://localhost:9000", annotators=['parse']) as client:
+		text = ' '.join([w for w in outputSentence if w!=None]).replace(':', 'xxjxx').replace(' .', '.')
+		parse = client.annotate(text)
+	#converts the funky format stanfordCoreNlp uses to the S-expression tree format we need
+	def snlpToString(node): 
+		if len(node.child)==0:
+			return node.value
+		toReturn = [node.value]
+		for c in node.child:
+			toReturn.append(snlpToString(c))
+		return toReturn
+	trees = [snlpToString(s.parseTree) for s in parse.sentence]
+	#merge them all
+	toReturn = ['ROOT']
+	for t in trees:
+		toReturn = toReturn + t[1:]
+	return [1, toReturn]
+
+	# if returnDummy:
+	# 	return ['DUMMY_TREE'] + [['WORD', w] for w in outputSentence if w!=None]
+	# else:
+	# 	return ' '.join([w for w in outputSentence if w!=None])
 
 
 nextIndex = 0
@@ -377,7 +400,7 @@ E.g.: "is walking gingerly" => "walks gingerly"
 (VP (VBZ/VBP/VBD is/are/was/were) (VP (VBG walking) [...])) => (VP (VBZ/VBP walks/walk) [...])
 """
 def R8(T, snlp=None):
-# 	print("Calling on", T)
+	# print("Calling on", T)
 	if isinstance(T,str) or len(T)==0:
 		return [0,T]
 	if T[0]=='VP':
@@ -660,11 +683,11 @@ def S2_old(Tp, Th):
 
 
 if __name__=="__main__":
-	s = "(ROOT (NP (NP (DT A) (NN mom) (CC and) (NN son)) (VP (VBG enjoying) (NP (NP (DT a) (NN day)) (PP (IN in) (NP (DT the) (NN park))))) (. .)))"
-	print(R9(parseConstituency(s)))
+	# s = "(ROOT (NP (NP (DT A) (NN mom) (CC and) (NN son)) (VP (VBG enjoying) (NP (NP (DT a) (NN day)) (PP (IN in) (NP (DT the) (NN park))))) (. .)))"
+	# print(R9(parseConstituency(s)))
 
-	s = "(ROOT (S (NP (NP (DT A) (NN guy)) (PP (IN on) (NP (DT a) (NN skateboard)))) (, ,) (VP (VBG jumping) (PRT (RP off)) (NP (DT some) (NNS steps))) (. .)))"
-	print(R9(parseConstituency(s)))
+	# s = "(ROOT (S (NP (NP (DT A) (NN guy)) (PP (IN on) (NP (DT a) (NN skateboard)))) (, ,) (VP (VBG jumping) (PRT (RP off)) (NP (DT some) (NNS steps))) (. .)))"
+	# print(R9(parseConstituency(s)))
 
 	# s = "People talk to themselves"
 	# C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
@@ -676,11 +699,13 @@ if __name__=="__main__":
 	# # print(C)
 	# R2(C)
 
-	# s = "A boy and a girl play in his yard and she laughs"
-	# C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
-	# # print(C)
-	# R2(C)
-	# exit()
+	s = "A boy and a girl play in his yard and she laughs"
+	s = "A boy runs quickly."
+	C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
+	# print(C)
+	from FOL_resolution import printSExpNice
+	print(printSExpNice(R2(C)[1]))
+	exit()
 
 	# SNLI_LOCATION = "snli/snli_1.0_dev.txt"
 	# with open(SNLI_LOCATION, 'r') as F:
