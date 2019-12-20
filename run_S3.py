@@ -147,17 +147,32 @@ if __name__=="__main__":
 			"""Applies syntactic transformation rules to constituency tree T.
 			"""
 			def applySyntacticRules(T):
-				rules = [R1, R4, R5, R6, R7, R8, R2] #R2 is last because it changes the words by adding prefixes like p:. 
-				rules_noRecursive = [R3] #R3 must not be applied in a recursive manner; only to the top level node.
-				# print("snlp is", snlp)
+				rules = [R1, R4, R5, R6, R7, R8]  
+				#Apply recursive rules
 				for rule in rules:
 					try:
-						if rule not in rules_noRecursive:
-							[n, T] = applyRule(T, rule, snlp=snlp)
-						else:
-							[n, T] = applyRule(T, rule, False, snlp=snlp)
+						[n, T] = applyRule(T, rule, snlp=snlp)
 					except Exception as e:
 						print("Messed up on rule", str(rule), ", skipping...")
+						print("Full details:", str({v:eval(v) for v in varsToStore}))
+						print("Exception", e)
+						traceback.print_exc(file=sys.stdout)
+				#Apply nonrecursive rules
+				rules = [R3, R9]  
+				for rule in rules:
+					try:
+						[n, T] = applyRule(T, rule, False, snlp=snlp)
+					except Exception as e:
+						print("Messed up on rule", str(rule), ", skipping...")
+						print("Full details:", str({v:eval(v) for v in varsToStore}))
+						print("Exception", e)
+						traceback.print_exc(file=sys.stdout)
+				#Apply R2
+				for rule in rules:
+					try:
+						T = R2(T)
+					except Exception as e:
+						print("Messed up on rule R2, skipping...")
 						print("Full details:", str({v:eval(v) for v in varsToStore}))
 						print("Exception", e)
 						traceback.print_exc(file=sys.stdout)

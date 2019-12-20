@@ -152,12 +152,12 @@ warnings.filterwarnings("ignore") #comment this out if you want to see warnings
 """New version of R2. This uses coreference resolution to find chains of coreferences, and then iteratively remove all pronominals.
 You must make sure that the stanfordnlp server is running at http://localhost:9000.
 DO NOT CALL THIS USING APPLYRULE()! This rule operates differently from the others: it must be called individually, and does NOT return a constituency parse tree like it is passed. 
-Instead, it returns a dummy tree ['DUMMY_TREE', ['WORD', 'w1'], ['WORD', 'w2'], ...] simpy so that you can call treeToACEInput() with it.
+Instead, if returnDummy==True, it returns a dummy tree ['DUMMY_TREE', ['WORD', 'w1'], ['WORD', 'w2'], ...] simpy so that you can call treeToACEInput() with it. Otherwise, it just returns strings you can pass directly to APE.
 Thus, it is best to call this rule last.
 
 If this keeps outputting the "Starting Server with command..." line, go to (your virtualenv installation)/lib/python3.6/site-packages/stanfordnlp/server/client.py and comment out the print statement on line 118.
 """
-def R2(T):
+def R2(T, returnDummy=True):
 	#first, go through and attach an index to each root node tag (so the list ['DT', 'the'], not the string 'the')
 	outputSentence = []
 	toCheck = [T]
@@ -241,7 +241,10 @@ def R2(T):
 	# if len(sentenceHistory)>1:
 	# 	sentenceHistory = [s[0] + '\t\t' + s[1] for s in sentenceHistory]
 	# 	print('\n\t'.join(["SENTENCE HISTORY"] + sentenceHistory))
-	return ['DUMMY_TREE'] + [['WORD', w] for w in outputSentence if w!=None]
+	if returnDummy:
+		return ['DUMMY_TREE'] + [['WORD', w] for w in outputSentence if w!=None]
+	else:
+		return ' '.join([w for w in outputSentence if w!=None])
 
 
 nextIndex = 0
