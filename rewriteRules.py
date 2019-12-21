@@ -53,6 +53,8 @@ def getWordSequence(T):
 
 def treeToACEInput(T):
 	s = ' '.join(getWordSequence(T)).strip()
+	if len(s)<2:
+		raise Exception("Length of 's' is zero! T was:", str(T))
 # 	print("s1:", s)
 	if s[1]==':':
 		if s[2].islower():
@@ -152,11 +154,9 @@ import warnings
 warnings.filterwarnings("ignore") #comment this out if you want to see warnings
 """New version of R2. This uses coreference resolution to find chains of coreferences, and then iteratively remove all pronominals.
 You must make sure that the stanfordnlp server is running at http://localhost:9000.
-DO NOT CALL THIS USING APPLYRULE()! This rule operates differently from the others: it must be called individually, and does NOT return a constituency parse tree like it is passed. 
-Instead, if returnDummy==True, it returns a dummy tree ['DUMMY_TREE', ['WORD', 'w1'], ['WORD', 'w2'], ...] simpy so that you can call treeToACEInput() with it. Otherwise, it just returns strings you can pass directly to APE.
-Thus, it is best to call this rule last.
 
 If this keeps outputting the "Starting Server with command..." line, go to (your virtualenv installation)/lib/python3.6/site-packages/stanfordnlp/server/client.py and comment out the print statement on line 118.
+This is NOT a recursive rule; if calling with applyRule(), use recursive=False.
 """
 def R2(T, snlp=None):
 	#first, go through and attach an index to each root node tag (so the list ['DT', 'the'], not the string 'the')
@@ -252,8 +252,8 @@ def R2(T, snlp=None):
 	#converts the funky format stanfordCoreNlp uses to the S-expression tree format we need
 	def snlpToString(node): 
 		if len(node.child)==0:
-			return node.value
-		toReturn = [node.value]
+			return node.value.replace('xxjxx', ':')
+		toReturn = [node.value.replace('xxjxx', ':')]
 		for c in node.child:
 			toReturn.append(snlpToString(c))
 		return toReturn

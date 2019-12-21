@@ -16,8 +16,9 @@ import time
 
 """Point this to one of the text files that are part of the SNLI dataset. 
 """
-SNLI_LOCATION = "snli/snli/1.0_dev.txt"
-numDivisions = 500 #number of parts to divide the dataset into
+# SNLI_LOCATION = "snli/snli/1.0_dev.txt"
+SNLI_LOCATION = "snli/snli_1.0_dev.txt"
+numDivisions = 5 #number of parts to divide the dataset into
 experimentLabel = 'Output' #It will write output to a directory called 'attempts'.
 
 
@@ -106,7 +107,7 @@ if __name__=="__main__":
 			guess_values = ['neutral', 'entailment', 'contradiction']
 
 			#status report
-			if i%2==0:
+			if i%50==0:
 				print("\nPROCESS", processId, "ON ITERATION", i, "of", len(allLines), ":")
 				if allTimes[1]>0:
 					print("\tAverage time per problem:", allTimes[0]/allTimes[1])
@@ -158,21 +159,12 @@ if __name__=="__main__":
 						print("Exception", e)
 						traceback.print_exc(file=sys.stdout)
 				#Apply nonrecursive rules
-				rules = [R3, R9]  
+				rules = [R2, R3, R9]  
 				for rule in rules:
 					try:
 						[n, T] = applyRule(T, rule, False, snlp=snlp)
 					except Exception as e:
 						print("Messed up on rule", str(rule), ", skipping...")
-						print("Full details:", str({v:eval(v) for v in varsToStore}))
-						print("Exception", e)
-						traceback.print_exc(file=sys.stdout)
-				#Apply R2
-				for rule in rules:
-					try:
-						T = R2(T)
-					except Exception as e:
-						print("Messed up on rule R2, skipping...")
 						print("Full details:", str({v:eval(v) for v in varsToStore}))
 						print("Exception", e)
 						traceback.print_exc(file=sys.stdout)
@@ -192,6 +184,7 @@ if __name__=="__main__":
 				stoppedAtStage[1] += 1
 				assessGuess(guess_values[result], correct, Tp, Th, p, h)
 				continue
+			#else if result==0, keep going...
 
 			##########FINALLY, TRY IT WITH THE SEMANTIC RULES
 			# print("About to start S1")

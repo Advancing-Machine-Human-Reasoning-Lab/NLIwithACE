@@ -1,6 +1,6 @@
 import requests
 from translateFOF import treeToSexp, translateFOF_formula, removeDuplicateQuantifiedVars
-from FOL_resolution import printSExpNice, propStructToSExp, findContradiction, parseExpression
+from FOL_resolution import printSExpNice, propStructToSExp, findContradiction, parseExpression, applySubstitution
 # from rewriteRules import *
 import os
 import sys
@@ -9,7 +9,7 @@ import re
 #requires installation of APE: https://github.com/Attempto/APE
 #and swi-prolog: https://www.swi-prolog.org/
 
-APE_dir = "../APE" #directory containing ape.exe and clex_lexicon.pl.
+APE_dir = "pattern_folder/APE" #directory containing ape.exe and clex_lexicon.pl.
 
 """Call APE webservice to translate a sentence into TPTP format."""
 def sentenceToTPTP_web(sentence):
@@ -42,6 +42,99 @@ def sentenceToTPTP(sentence):
 		#the APE code has a bug where whenever "Table" appears, it converts it to (table X) instead of table(X).
 		return re.sub(r'\(table ([a-zA-Z0-9]+)\)', r'\(table\(\1\)\)', r)#.replace('\n', '')
 
+"""Takes a sequence of tptp formulae (in string form), removes any formulae with single unnecessary equalities (see below), and returns a single S-expression string (all ANDed together).
+Unnecessary equalities are formulae that are existentially quantified, where there is a single clause in the scope of the quantifier that has an equality with the
+quantified variable which can be replaced. We only check for one form which is common in APE-to-TPTP:
+	(EXISTS x (EXISTS y (AND (x='cat') (Hates x 'dog' y))))
+		can be replaced with
+	(EXISTS y (AND (Hates 'cat' 'dog' y)))
+		and since this leaves an unnecessary AND, it becomes:
+	(EXISTS y (Hates 'cat' 'dog' 'y'))
+"""
+def tptpsToSexp(tptp):
+	tptps = [t.strip() for t in tptp.split('.\n') if t.strip()!='']
+	for (i,t) in enumerate(tptps):
+		t = t.strip()
+		if t[-1]!='.':
+			tptps[i] = t + '.'
+		else:
+			tptps[i] = t
+	# print("tptps:", tptps) 
+	Ts = [removeDuplicateQuantifiedVars(translateFOF_formula(t)) for t in tptps]
+	newTs = []
+	#remove unnecessary equalities
+	#first, check if it starts with a string of 'EXISTS' followed by 'AND':
+	for (i,T) in enumerate(Ts):
+		vars = set()
+		conjuncts = []
+		currNode = T
+		isForm = True #is T in the form we're looking for?
+		while True:
+			if isinstance(currNode, list):
+				if currNode[0]=='EXISTS':
+					vars.add(currNode[1])
+					currNode = currNode[2]
+					continue
+				elif currNode[0]=='AND':
+					#look for a child that has 'EQUALS' as its top-level predicate.
+					foundEquals = False
+					for j in range(1,len(currNode)):
+						if isinstance(currNode[j], list) and currNode[j][0]=='EQUALS':
+							foundEquals = True
+							break
+# 						else:
+# 							print("Child was", currNode[0], j)
+					if foundEquals:
+						if (currNode[j][1] in vars and currNode[j][2][0]=="'" and currNode[j][2][-1]=="'") or \
+							(currNode[j][2] in vars and currNode[j][1][0]=="'" and currNode[j][1][-1]=="'"):
+							#this is the one!
+							if currNode[j][1] in vars:
+								varToRemove = currNode[j][1]
+								objToReplaceWith = currNode[j][2]
+							else:
+								varToRemove = currNode[j][2]
+								objToReplaceWith = currNode[j][1]
+							sub = {varToRemove:objToReplaceWith}
+							vars.remove(varToRemove)
+							#replace all instances of varToRemove in the conjuncts with objToReplaceWith
+							for k in range(1, len(currNode)):
+								if k==j:
+									continue
+								conjuncts.append( applySubstitution(currNode[k], sub) )
+							isForm = True
+							break
+						else:
+							isForm = False
+							#print("1")
+							break
+					else:
+						isForm = False
+						#print("2")
+						break
+				else:
+					isForm = False
+					#print("3")
+					break
+			else:
+				isForm = False
+				#print("4")
+				break
+		if isForm:
+			if len(conjuncts) == 1:
+				newT = conjuncts[0]
+			else:
+				newT = ['AND'] + conjuncts
+			for v in vars:
+				newT = ['EXISTS', v, newT]
+			newTs.append(newT)
+		else:
+			newTs.append(T)
+	return "(AND " + ' '.join([propStructToSExp(t) for t in newTs]) + ")"
+	
+# [
+# 	['EXISTS', 'A', ['EXISTS', 'B', ['EXISTS', 'C', ['EXISTS', 'D', ['EXISTS', 'E', ['AND', ['predicate1', 'A', 'laugh', 'B'], ['AND', ['object', 'C', 'na', 'countable', 'na', 'eq', '2'], ['AND', ['has_part', 'C', 'B'], ['AND', ['girl', 'B'], ['AND', ['modifier_pp', 'D', 'in', 'E'], ['AND', ['predicate1', 'D', 'play', 'C'], ['AND', ['has_part', 'C', "'DefaultName0'"], ['AND', ['yard', 'E'], ['relation', 'E', 'of', "'DefaultName0'"]]]]]]]]]]]]]], 
+# 	['EXISTS', 'A', ['AND', ['EQUALS', "'DefaultName0'", 'A'], ['boy', 'A']]]
+# ]
 
 """Determines if the natural language sentence s2 follows from s1.
 Returns: 0 (neutral), 1 (entailment), 2 (contradiction), or
@@ -58,7 +151,7 @@ def sentenceEntailment(s1, s2, maxNumClauses=1500, additionalFormulas=[]):
 			return -2
 		else:
 			return -1
-	[parsedPremise, parsedHypothesis] = [propStructToSExp(removeDuplicateQuantifiedVars(translateFOF_formula(t))) for t in tptps]
+	[parsedPremise, parsedHypothesis] = [tptpsToSexp(t) for t in tptps]
 	# print("S-exps:\n\t", parsedPremise, '\n\t', parsedHypothesis)
 	#test for entailment
 	[result,trace,clauses] = findContradiction(additionalFormulas + [parsedPremise, "(NOT " + parsedHypothesis + ")"], maxNumClauses, verbose=False, returnTrace=True)
@@ -74,4 +167,6 @@ def sentenceEntailment(s1, s2, maxNumClauses=1500, additionalFormulas=[]):
 		return 0
 
 if __name__=="__main__":
-	pass
+	tptps = sentenceToTPTP("p:DefaultName0 and a girl play in p:DefaultName0's yard and she laughs . p:DefaultName0 is a boy .")
+# 	print("tptps:", tptps)
+	print(tptpsToSexp(tptps))
