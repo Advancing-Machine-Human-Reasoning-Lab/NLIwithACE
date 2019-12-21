@@ -155,6 +155,7 @@ if __name__=="__main__":
 						[n, T] = applyRule(T, rule, snlp=snlp)
 					except Exception as e:
 						print("Messed up on rule", str(rule), ", skipping...")
+						print("I was trying to apply the rule to this tree:", T)
 						print("Full details:", str({v:eval(v) for v in varsToStore}))
 						print("Exception", e)
 						traceback.print_exc(file=sys.stdout)
@@ -165,6 +166,7 @@ if __name__=="__main__":
 						[n, T] = applyRule(T, rule, False, snlp=snlp)
 					except Exception as e:
 						print("Messed up on rule", str(rule), ", skipping...")
+						print("I was trying to apply the rule to this tree:", T)
 						print("Full details:", str({v:eval(v) for v in varsToStore}))
 						print("Exception", e)
 						traceback.print_exc(file=sys.stdout)

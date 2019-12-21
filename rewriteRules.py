@@ -53,8 +53,9 @@ def getWordSequence(T):
 
 def treeToACEInput(T):
 	s = ' '.join(getWordSequence(T)).strip()
-	if len(s)<2:
-		raise Exception("Length of 's' is zero! T was:", str(T))
+# 	if len(s)<2:
+# 		print("ERROR:\n\tT was:", T, "\n\tgetWordSequence(T) was:", getWordSequence(T))
+# 		raise Exception()
 # 	print("s1:", s)
 	if s[1]==':':
 		if s[2].islower():
@@ -75,6 +76,8 @@ if recursive=False, then this only tries to apply the rule to the top node of th
 def applyRule(T, rule, recursive=True, snlp=None):
 	# print("T is", T, "R is", rule)
 	[b, newT] = rule(T, snlp)
+	if not recursive:
+		return [b, newT]
 	if b:
 		return [1, newT]
 	else:
