@@ -1,6 +1,10 @@
 """
 This file contains code to work with rewrite rules: rules that take a natural language sentence (and a constituency parse in some cases) and modify it so that it is more likely to be parseable by Attempto's parser, while preserving as many of the original sentence's semantics as possible.
 
+In order to get R2 to work, you must start up a stanford server using:
+java -Xmx16G -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer -timeout 30000 -port 9000 -threads 5 -quiet True -preload coref
+See documentation on StanfordCoreNLP on how to install this.
+
 Author: John Licato, licato@usf.edu
 """
 from FOL_resolution import parseExpression, propStructToSExp
