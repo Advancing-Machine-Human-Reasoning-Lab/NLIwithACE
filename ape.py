@@ -82,8 +82,8 @@ def tptpsToSexp(tptp):
 						if isinstance(currNode[j], list) and currNode[j][0]=='EQUALS':
 							foundEquals = True
 							break
-# 						else:
-# 							print("Child was", currNode[0], j)
+						# else:
+						# 	print("Child was", currNode[0], j)
 					if foundEquals:
 						if (currNode[j][1] in vars and currNode[j][2][0]=="'" and currNode[j][2][-1]=="'") or \
 							(currNode[j][2] in vars and currNode[j][1][0]=="'" and currNode[j][1][-1]=="'"):
@@ -130,11 +130,7 @@ def tptpsToSexp(tptp):
 		else:
 			newTs.append(T)
 	return "(AND " + ' '.join([propStructToSExp(t) for t in newTs]) + ")"
-	
-# [
-# 	['EXISTS', 'A', ['EXISTS', 'B', ['EXISTS', 'C', ['EXISTS', 'D', ['EXISTS', 'E', ['AND', ['predicate1', 'A', 'laugh', 'B'], ['AND', ['object', 'C', 'na', 'countable', 'na', 'eq', '2'], ['AND', ['has_part', 'C', 'B'], ['AND', ['girl', 'B'], ['AND', ['modifier_pp', 'D', 'in', 'E'], ['AND', ['predicate1', 'D', 'play', 'C'], ['AND', ['has_part', 'C', "'DefaultName0'"], ['AND', ['yard', 'E'], ['relation', 'E', 'of', "'DefaultName0'"]]]]]]]]]]]]]], 
-# 	['EXISTS', 'A', ['AND', ['EQUALS', "'DefaultName0'", 'A'], ['boy', 'A']]]
-# ]
+
 
 """Determines if the natural language sentence s2 follows from s1.
 Returns: 0 (neutral), 1 (entailment), 2 (contradiction), or

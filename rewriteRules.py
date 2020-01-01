@@ -1,10 +1,6 @@
 """
 This file contains code to work with rewrite rules: rules that take a natural language sentence (and a constituency parse in some cases) and modify it so that it is more likely to be parseable by Attempto's parser, while preserving as many of the original sentence's semantics as possible.
 
-In order to get R2 to work, you must start up a stanford server using:
-java -Xmx16G -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer -timeout 30000 -port 9000 -threads 5 -quiet True -preload coref
-See documentation on StanfordCoreNLP on how to install this.
-
 Author: John Licato, licato@usf.edu
 """
 from FOL_resolution import parseExpression, propStructToSExp
@@ -57,10 +53,11 @@ def getWordSequence(T):
 
 def treeToACEInput(T):
 	s = ' '.join(getWordSequence(T)).strip()
-# 	if len(s)<2:
-# 		print("ERROR:\n\tT was:", T, "\n\tgetWordSequence(T) was:", getWordSequence(T))
-# 		raise Exception()
-# 	print("s1:", s)
+	# print("T:", T, "s:", s)
+	# if len(s)<2:
+	# 	print("ERROR:\n\tT was:", T, "\n\tgetWordSequence(T) was:", getWordSequence(T))
+	# 	raise Exception()
+	# print("s1:", s)
 	if s[1]==':':
 		if s[2].islower():
 			s = s[:2] + s[2].upper() + s[3:]
@@ -70,6 +67,7 @@ def treeToACEInput(T):
 		s = s + '.'
 	if s[-2] == ' ':
 		s = s[:-2] + s[-1]
+	# print("to return:", s)
 	return s
 
 """
@@ -161,6 +159,9 @@ import warnings
 warnings.filterwarnings("ignore") #comment this out if you want to see warnings
 """New version of R2. This uses coreference resolution to find chains of coreferences, and then iteratively remove all pronominals.
 You must make sure that the stanfordnlp server is running at http://localhost:9000.
+Use the commands (on server, from within stanford nlp directory):
+export CORENLP_HOME=/home/licato/stanfordnlp_resources/stanford-corenlp-full-2018-10-05/stanford-corenlp-full-2018-10-05
+java -mx4g -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer -port 9000 -timeout 15000 -preload coref 
 
 If this keeps outputting the "Starting Server with command..." line, go to (your virtualenv installation)/lib/python3.6/site-packages/stanfordnlp/server/client.py and comment out the print statement on line 118.
 This is NOT a recursive rule; if calling with applyRule(), use recursive=False.
@@ -168,30 +169,44 @@ This is NOT a recursive rule; if calling with applyRule(), use recursive=False.
 def R2(T, snlp=None):
 	#first, go through and attach an index to each root node tag (so the list ['DT', 'the'], not the string 'the')
 	outputSentence = []
+	outputLabels = [] #if we have APE labels, like p: or n:, save them here
 	T_backup = copy.deepcopy(T)
 	toCheck = [T]
-	# print("INPUT:", T)
+	#collect all of the tokens here. Remove all p:, n:, and a: tags and remember where they were for later.
 	while len(toCheck)>0:
 		# print(toCheck)
 		# input()
 		curr = toCheck.pop(0)
-		if isinstance(curr[1], str):
-			outputSentence.append(curr[1])
-		elif isinstance(curr,str):
+		if isinstance(curr, str):
 			raise Exception("Unsure how to parse subtree:", curr)
-		else:
-			toCheck = curr[1:] + toCheck
+		elif isinstance(curr, list):
+			if len(curr) < 2:
+				raise Exception("R2 trying to parse improperly formed list:" + str(curr) + "\n\tOriginal sentence:" + str(T_backup))
+			if isinstance(curr[1], str): #TODO: errors on this line (list index out of range)
+				if len(curr[1]) >= 2 and curr[1][1] == ':':
+					outputLabels.append(curr[1][0])
+					outputSentence.append(curr[1][2:])
+				else:
+					outputLabels.append(None)
+					outputSentence.append(curr[1].strip())
+			else:
+				toCheck = curr[1:] + toCheck
 	if outputSentence[-1].strip() != ".":
 		outputSentence.append(".")
+		outputLabels.append(None)
 	#next, contact the server to calculate coreference resolution
-	flatSentence = treeToACEInput(T)
+	flatSentence = ' '.join(outputSentence).replace(' .', '.')
+	
 	sentenceHistory = []
 	def updateHistory(step):
 		st = ' '.join([w for w in outputSentence if w!=None])
 		if len(sentenceHistory)==0 or st != sentenceHistory[-1][0]:
 			sentenceHistory.append([st, step])
 	with CoreNLPClient(endpoint="http://localhost:9000") as client:
-		crc = getCrc(flatSentence, client)
+		ann = client.annotate(flatSentence)
+		# print("Passed:", flatSentence, '\n\toutputSentence:', outputSentence)
+		crc = ann.corefChain
+		# print(ann.__dir__())
 		chains = [parseCrc(str(chain)) for chain in crc]
 		# print(chains)
 		updateHistory('start')
@@ -221,7 +236,7 @@ def R2(T, snlp=None):
 		chainNames.append(chainName)
 		#now we know the chain's proper name, and there should be no other proper nouns.
 		#next, find all pronominals, and replace them with name, name + ‘s if possessive. If pronominal has more than one word, exception. 
-		pronominal_links = [link for link in chain if link['mentionType']=='PRONOMINAL']
+		pronominal_links = [link for link in chain if link['mentionType']=='PRONOMINAL' and link['number']!='PLURAL']
 		for link in pronominal_links:
 			if link['sentenceIndex']>0:
 				raise Exception("There was more than one sentence here, don't know how to handle it:" + flatSentence)
@@ -232,7 +247,7 @@ def R2(T, snlp=None):
 				outputSentence[link['beginIndex']] = chainName + "'s"
 			else:
 				outputSentence[link['beginIndex']] = chainName
-			updateHistory('removed pronominals')
+			updateHistory('removed pronominals, ' + str(link))
 	for (chainIndex, chain) in enumerate(chains):
 		chainName = chainNames[chainIndex]
 		#Replace all multi-word nominals with the name, add "[name] is [nominal]" to there.
@@ -249,12 +264,15 @@ def R2(T, snlp=None):
 			#add sentence
 			outputSentence += [chainName, 'is'] + nominal + ['.']
 			updateHistory("removed nominal")
-	# if len(sentenceHistory)>1:
-	# 	sentenceHistory = [s[0] + '\t\t' + s[1] for s in sentenceHistory]
-	# 	print('\n\t'.join(["SENTENCE HISTORY"] + sentenceHistory))
+	
+	#replace all p:, n:, and a: tags
+	for i in range(len(outputLabels)):
+		if outputLabels[i]!=None and outputSentence[i]!=None:
+			outputSentence[i] = outputLabels[i] + 'xxjxx' + outputSentence[i]
 	#turn it into a string, then get new constituency parse:
 	with CoreNLPClient(endpoint="http://localhost:9000", annotators=['parse']) as client:
 		text = ' '.join([w for w in outputSentence if w!=None]).replace(':', 'xxjxx').replace(' .', '.')
+		# print("asking to parse:", text)
 		parse = client.annotate(text)
 	#converts the funky format stanfordCoreNlp uses to the S-expression tree format we need
 	def snlpToString(node): 
@@ -269,7 +287,15 @@ def R2(T, snlp=None):
 	toReturn = ['ROOT']
 	for t in trees:
 		toReturn = toReturn + t[1:]
+	updateHistory("about to return")
+	# print("SENTENCE HISTORY:")
+	# for l in sentenceHistory:
+	# 	print('\t', l)
+	# input("Press enter...")
 	return [1, toReturn]
+
+	# for (i,t) in enumerate(ann.sentence[0].token):
+	# 	print("token", i, ":", t.word)
 
 	# if returnDummy:
 	# 	return ['DUMMY_TREE'] + [['WORD', w] for w in outputSentence if w!=None]
@@ -399,6 +425,9 @@ def R7(T, snlp=None):
 				#regardless of what type of CC it is, add 'and'
 				prevWasAdv = False
 				toReturn.append(['CC', 'and'])
+			else:
+				#just add back whatever was there
+				toReturn.append(c)
 		return [1, toReturn]
 	return [0,T]
 
@@ -426,19 +455,83 @@ def R8(T, snlp=None):
 	return [0,T]
 
 
-"""Wasn't in original FLAIRS submission. If a sentence has a single NP at its root, then insert "There is" in the beginning.
+"""Wasn't in original FLAIRS submission. Takes certain forms of descriptive utterances and converts them to proper sentences. 
+
+If it is a non-sentence with an "-ing" verb, then convert it to "is -ing". Note that running this before rule R8 is ideal.
+* From: (ROOT (NP (NP X) (VP Y_pre (VBG v) Y_post)) P), 
+* to:      (ROOT (S (NP X) (VP (VBZ/VBP is/are) Y_pre (VP (VBG v) Y_post))) P)
+Look for NNP or NNS in X (using breadth-first search) to determine whether it's plural or not.
+
+Otherwise, if a sentence has a single NP at its root, then insert "There is" in the beginning.
 Currently doesn't account for plural nouns or lists.
-(ROOT (NP xxx)) ==> (ROOT (S (NP (EX There) (VP (VBZ is) (NP xxx))))) 
+(ROOT (NP xxx)) ==> (ROOT (S (NP (EX There) (VP (VBZ/VBP is/are) (NP xxx))))) 
 
 This is NOT a recursive rule; if calling with applyRule(), use recursive=False.
 """
 def R9(T, snlp=None):
 	if T[0]=='ROOT' and len(T)==2 and isinstance(T[1], list) and T[1][0]=='NP':
-		original = T[1]
-		if isinstance(original[1], list) and original[1][0]=='NP' and isinstance(original[1][1], list) and original[1][1][0]=='DT':
-			original[1][1][1] = original[1][1][1].lower()
-		newT = ['ROOT', ['S', ['NP', ['EX', 'There'], ['VP', ['VBZ', 'is'], original]]]]
-		return [1,newT]
+		# print("h2")
+		if len(T[1])>=3 and T[1][1][0]=='NP' and T[1][2][0]=='VP':
+			# print("h1")
+			X = T[1][1][1:]
+			P = T[3:]
+			#does X contain NN/NNP or NNS/NNPS? Use BFS to find the least deeply-nested one.
+			isPlural = False
+			foundPOS = False
+			toSearch = [X]
+			while len(toSearch)>0:
+				curr = toSearch.pop(0)
+				# print("checking", curr)
+				if isinstance(curr, str):
+					# print("here", curr)
+					continue
+				#otherwise, assume it's a list
+				if curr[0] in ['NN', 'NNP']:
+					foundPOS = True
+					isPlural = False
+					# print("here2", curr)
+					break
+				elif curr[0] in ['NNS', 'NNPS']:
+					foundPOS = True
+					isPlural = True
+					# print("here3", curr)
+					break
+				else:
+					for c in curr[1:]:
+						# print("adding",c)
+						toSearch.append(c)
+			if not foundPOS:
+				# print("None in " + str(X))
+				return [0,T]
+			# print("h3")
+			#are one of the children of T[1][2] a VBG? If so, find out Y_pre and Y_post
+			vbg_id = -1
+			for i in range(1, len(T[1][2])):
+				if T[1][2][i][0] == 'VBG':
+					vbg_id = i
+					break
+			if vbg_id >= 0:
+				# print("h4")
+				Y_pre = T[1][2][1:vbg_id]
+				v = T[1][2][vbg_id][1]
+				Y_post = T[1][2][vbg_id+1:]
+				#(ROOT (S (NP X) (VP (VBZ/VBP is/are) Y_pre (VP (VBG v) Y_post))))
+				if isPlural:
+					newT = ['ROOT', ['S', ['NP']+X, ['VP', ['VBP', 'are']] + Y_pre + [['VP', ['VBG', v]] + Y_post] + P]]
+				else:
+					newT = ['ROOT', ['S', ['NP']+X, ['VP', ['VBZ', 'is']] + Y_pre + [['VP', ['VBG', v]] + Y_post] + P]]
+				return [1,newT]
+			else: #it doesn't fit the form, so let's just append "There is" to the front.
+				original = T[1]
+				curr = T
+				while not isinstance(curr[1], str):
+					curr = curr[1]
+				curr[1] = curr[1][0].lower() + curr[1][1:]
+				if isPlural:
+					newT = ['ROOT', ['S', ['NP', ['EX', 'There'], ['VP', ['VBP', 'are'], original]]]]
+				else:
+					newT = ['ROOT', ['S', ['NP', ['EX', 'There'], ['VP', ['VBZ', 'is'], original]]]]
+				return [1,newT]
 	return [0,T]
 
 #given a dictionary of hyperyms, returns all possible transformations
@@ -706,12 +799,22 @@ if __name__=="__main__":
 	# # print(C)
 	# R2(C)
 
-	s = "A boy and a girl play in his yard and she laughs"
-	s = "A boy runs quickly."
-	C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
-	# print(C)
+	s = """(ROOT
+  (NP
+    (NP (JJ Young) (NNS girls))
+    (VP
+      (ADVP (RB gingerly))
+      (VBG knitting)
+      (NP (DT a) (NN sweater)))
+    (. .)))
+	"""
+	# C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
+	C = parseConstituency(s)
+	print(C)
 	from FOL_resolution import printSExpNice
-	print(printSExpNice(R2(C)[1]))
+	r = R9(C)[1]
+	print(r)
+	print(printSExpNice(r))
 	exit()
 
 	# SNLI_LOCATION = "snli/snli_1.0_dev.txt"

@@ -18,7 +18,7 @@ import time
 """
 # SNLI_LOCATION = "snli/snli/1.0_dev.txt"
 SNLI_LOCATION = "snli/snli_1.0_dev.txt"
-numDivisions = 5 #number of parts to divide the dataset into
+numDivisions = 10 #number of parts to divide the dataset into
 experimentLabel = 'Output' #It will write output to a directory called 'attempts'.
 
 
@@ -68,11 +68,11 @@ if __name__=="__main__":
 	
 	ruleCounts = {'S1':0, 'S2':0, 'S3':0}
 	coverage=0 #number of sentences parsed successfully
-	parsed = 0 #number of full pairs parsed successfully
+	attempted = 0 #number of sentences tried to parse
 	score_A2 = [0,0] #times it was correct vs wrong (out of successful parses)
 	score_A3 = [0,0] #times it was correct vs wrong (out of successful parses)
 	stoppedAtStage = [0,0,0,0,0]
-	varsToStore = ['ruleCounts', 'coverage', 'parsed', 'experimentLabel', 'i', 'score_A2', 'score_A3', 'allTimes', 'processId', 'startAt', 'stoppedAtStage']
+	varsToStore = ['ruleCounts', 'coverage', 'attempted', 'experimentLabel', 'i', 'score_A2', 'score_A3', 'allTimes', 'processId', 'startAt', 'stoppedAtStage']
 	
 	lastTime = None
 	allTimes = [0,0] #total, sum
@@ -108,7 +108,7 @@ if __name__=="__main__":
 
 			#status report
 			if i%50==0:
-				print("\nPROCESS", processId, "ON ITERATION", i, "of", len(allLines), ":")
+				print("\n\nPROCESS", processId, "ON ITERATION", i, "of", len(allLines), ":")
 				if allTimes[1]>0:
 					print("\tAverage time per problem:", allTimes[0]/allTimes[1])
 				for v in varsToStore:
@@ -137,9 +137,12 @@ if __name__=="__main__":
 # 			print("ORIGINAL:")
 # 			print('\tP:'+' '.join(treeToACEInput(Tp)))
 # 			print('\tH:'+' '.join(treeToACEInput(Th)))
+			attempted += 2
+			#let's see if, before applying any rules whatsoever, it can parse and make a guess
 			result = sentenceEntailment(treeToACEInput(Tp), treeToACEInput(Th))
-			if result > 0:
+			if result > 0: #if it guessed 'entailment' or 'contradiction'
 				stoppedAtStage[0] += 1
+				coverage += 2
 				assessGuess(guess_values[result], correct, Tp, Th, p, h)
 				continue
 
@@ -148,44 +151,73 @@ if __name__=="__main__":
 			"""Applies syntactic transformation rules to constituency tree T.
 			"""
 			def applySyntacticRules(T):
-				rules = [R1, R4, R5, R6, R7, R8]  
-				#Apply recursive rules
+				sentenceHistory = []
+				def updateHistory(currT, step):
+					st = str(currT)
+					if len(sentenceHistory)==0 or st != sentenceHistory[-1][0]:
+						sentenceHistory.append([st, step])
+				updateHistory(T, "start")
+				#Apply rule R9, because it completes sentence fragments and must be done before R8
+				try:
+					[n, T] = applyRule(T, R9, False, snlp=snlp)
+				except Exception as e:
+					print("\n\nMessed up on rule R9, skipping...")
+					print("I was trying to apply the rule to this tree:", T)
+					print("Full details:", str({v:eval(v) for v in varsToStore}))
+					print("Exception", e)
+					traceback.print_exc(file=sys.stdout)
+					# input("Press enter...")	 
+				#Apply recursive rules			
+				rules = [R1, R4, R5, R6, R7, R8] 
 				for rule in rules:
 					try:
 						[n, T] = applyRule(T, rule, snlp=snlp)
+						updateHistory(T, "after " + str(rule))
 					except Exception as e:
-						print("Messed up on rule", str(rule), ", skipping...")
+						print("\n\nMessed up on rule", str(rule), ", skipping...")
 						print("I was trying to apply the rule to this tree:", T)
 						print("Full details:", str({v:eval(v) for v in varsToStore}))
+						print("History:")
+						for [s,step] in sentenceHistory:
+							print("\t", step, ":", s)
 						print("Exception", e)
 						traceback.print_exc(file=sys.stdout)
+						# input("Press enter...")
 				#Apply nonrecursive rules
-				rules = [R2, R3, R9]  
+				rules = [R3, R2] #apply R2 last because it adds extra sentences  
 				for rule in rules:
 					try:
 						[n, T] = applyRule(T, rule, False, snlp=snlp)
 					except Exception as e:
-						print("Messed up on rule", str(rule), ", skipping...")
+						print("\n\nMessed up on rule", str(rule), ", skipping...")
 						print("I was trying to apply the rule to this tree:", T)
 						print("Full details:", str({v:eval(v) for v in varsToStore}))
 						print("Exception", e)
 						traceback.print_exc(file=sys.stdout)
+						# input("Press enter...")
 				return T
 			Tp = applySyntacticRules(Tp)
 			Th = applySyntacticRules(Th)
-			# print("Tp after syntactic transform:", Tp)
 
 			# print("\nEntailment between:\n\t", Tp, "\n\t", Th)
 			#use normal entailment. If it guesses ent. or con., then save to file and go to next pair
 			result = sentenceEntailment(treeToACEInput(Tp), treeToACEInput(Th))
 			# print("\tResult:", result)
-			if result < 0:
+			if result < 0: #there was an error parsing Tp or Th.
+				# print("ERROR:\n\tTp:", Tp, "\n\tTh:", Th, "\n\tACE Tp:", treeToACEInput(Tp), "\n\tACE Th:", treeToACEInput(Th))
+				# input()
 				stoppedAtStage[1] += 1
+				if result==-1: #at least one sentence parsed successfully
+					coverage += 1
+				with open("attempts/" + experimentLabel + '_' + str(processId) + "_parseFails.txt", 'a') as F:
+					F.write('\t'.join([correct, treeToACEInput(Tp), treeToACEInput(Th), p, h]).strip() + '\n')
 				continue #call it a loss, don't count it
-			elif result > 0:
-				stoppedAtStage[1] += 1
-				assessGuess(guess_values[result], correct, Tp, Th, p, h)
-				continue
+			else: #both sentences parsed!
+				coverage += 2
+				if result > 0: #did it make a guess of non-neutral?
+					stoppedAtStage[1] += 1
+					assessGuess(guess_values[result], correct, Tp, Th, p, h)
+					continue
 			#else if result==0, keep going...
 
 			##########FINALLY, TRY IT WITH THE SEMANTIC RULES
