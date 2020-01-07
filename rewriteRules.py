@@ -68,7 +68,7 @@ def treeToACEInput(T):
 	if s[-2] == ' ':
 		s = s[:-2] + s[-1]
 	# print("to return:", s)
-	return s
+	return s.replace(" 's", "'s").replace(" .", ".")
 
 """
 Searches through T and replaces subtrees where the rule applies. Returns [n, newT] where
