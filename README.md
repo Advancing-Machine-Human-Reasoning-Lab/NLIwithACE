@@ -19,6 +19,9 @@ If this last line gives sql errors, open setup.py and look for the sql dependenc
 4. Download the Attempto parsing engine (https://github.com/Attempto/APE) and install it using the instructions on that page. Make note of the directory into which you download this engine, and edit "ape.py" to point to it.
 5. Download the Clex lexicon, clex_lexicon.pl (https://github.com/Attempto/Clex). Put this file in the same directory as ape.exe.
 6. Download the StanfordNLP library (https://stanfordnlp.github.io/stanfordnlp/). Don't forget to do the one-time download using `stanfordnlp.download('en')`, as per the directions on that page.
+7. (Optional) If you are using the latest version of the syntactic rewrite rule R2 in rewriteRules.py, you also need to install the stanford corenlp server. Make sure you download it here (https://stanfordnlp.github.io/CoreNLP/index.html#download). In a separate window, cd to the folder where you have it installed, and type this:
+`java -Xmx16G -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer -timeout 30000 -port 9000 -threads 5 -quiet True -preload coref`
+It will start up a CoreNLPServer that will listen on port 9000. R2() in rewriteRules.py will be communicating with this.
 
 ## Example Usage
 
