@@ -140,8 +140,7 @@ def R1(T, snlp=None):
 		return [0,T_original]
 
 """This is the version of R2 that was used in the FLAIRS 2020 paper. It is very problematic, and has been replaced.
-
-Replace `he/him' with `p:DMale' ('p:' identifies pronouns in APE) and `his' with `p:DMale's,' `she/her/hers' with `p:DFemale/p:DFemale's,' and `they/them/theirs' with `p:DGroup/p:DGroup's.' This is a weak form of coreference resolution; e.g., we essentially assume that whenever the premise and hypothesis use `he,' they are referring to the same person."""
+Replaces `he/him' with `p:DMale' ('p:' identifies pronouns in APE) and `his' with `p:DMale's,' `she/her/hers' with `p:DFemale/p:DFemale's,' and `they/them/theirs' with `p:DGroup/p:DGroup's.' This is a weak form of coreference resolution; e.g., we essentially assume that whenever the premise and hypothesis use `he,' they are referring to the same person."""
 def R2_OLD(T, snlp=None):
 	if isinstance(T, str):
 		toReplace = ['he', 'him', 'his', 'she', 'her', 'hers', 'they', 'them', 'their']
@@ -311,7 +310,7 @@ def R3(T, snlp=None):
 	#first, convert to a sentence and get the dependency parse
 	sentence = ' '.join(getWordSequence(T))
 	dparse = snlp(sentence)
-	#which are subjects?
+	#find out what the subjects of each verb are
 	subjectOf = dict() #key: index of a verb, value: the subject of this verb
 	for (v,t,o) in dparse.sentences[0].dependencies:
 		if t=='nsubj':
@@ -608,8 +607,10 @@ def S1(Tp, Th):
 					nonHypernyms[n2].add(n1)
 	return [hypernyms, nonHypernyms]
 
+"""Same as S1, except it does it with verbs instead of nouns.
+"""
 def S2(Tp, Th):
-	#find all nouns in Tp, and then in Th
+	#find all verbs in Tp, and then in Th
 	POS_tags = ['VB', 'VBZ', 'VBP'] #any other verb forms should have been filtered out already
 	premiseVerbs = getWordsByPOS(Tp, POS_tags) 
 	hypVerbs = getWordsByPOS(Th, POS_tags) 
