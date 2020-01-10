@@ -129,7 +129,12 @@ def tptpsToSexp(tptp):
 			newTs.append(newT)
 		else:
 			newTs.append(T)
-	return "(AND " + ' '.join([propStructToSExp(t) for t in newTs]) + ")"
+	if len(newTs)==0:
+		raise Exception("There were no formulae detected in the tptp string! " + tptp)
+	elif len(newTs)==1:
+		return propStructToSExp(newTs[0])
+	else:
+		return "(AND " + ' '.join([propStructToSExp(t) for t in newTs]) + ")"
 
 
 """Determines if the natural language sentence s2 follows from s1.
