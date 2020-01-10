@@ -134,9 +134,9 @@ if __name__=="__main__":
 				else:
 					with open("attempts/" + experimentLabel + '_' + str(processId) + "_incorrect.txt", 'a') as F:
 						F.write('\t'.join([correct, guess, treeToACEInput(Tp), treeToACEInput(Th), p, h]).strip() + '\n')
-# 			print("ORIGINAL:")
-# 			print('\tP:'+' '.join(treeToACEInput(Tp)))
-# 			print('\tH:'+' '.join(treeToACEInput(Th)))
+			# print("ORIGINAL:")
+			# print('\tP:'+' '.join(treeToACEInput(Tp)))
+			# print('\tH:'+' '.join(treeToACEInput(Th)))
 			attempted += 2
 			#let's see if, before applying any rules whatsoever, it can parse and make a guess
 			result = sentenceEntailment(treeToACEInput(Tp), treeToACEInput(Th))
@@ -256,7 +256,7 @@ if __name__=="__main__":
 					extraFormulas.append('(FORALL a (FORALL b (IMPLIES (predicate1 a %s b) (predicate1 a %s b))))' % (w1, w2))
 					extraFormulas.append('(FORALL a (FORALL b (FORALL c (IMPLIES (predicate2 a %s b c) (predicate2 a %s b c)))))' % (w1, w2))
 					#extraFormulas.append('(FORALL a (FORALL b (FORALL c (FORALL d (IMPLIES (predicate3 a %s b c d) (predicate3 a %s b c d))))))' % (w1, w2))
-# 			print("Added formulas:", extraFormulas)
+			# print("Added formulas:", extraFormulas)
 			
 			# print("About to start SE")
 			#use normal entailment. If it guesses ent. or con., then save to file and go to next pair
