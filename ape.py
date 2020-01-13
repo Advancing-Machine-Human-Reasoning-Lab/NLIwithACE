@@ -167,7 +167,65 @@ def sentenceEntailment(s1, s2, maxNumClauses=1500, additionalFormulas=[]):
 	else:
 		return 0
 
+"""
+Compresses a formula to remove multiple nested existential quantifiers and binary ANDs. E.g.,
+it replaces (EXISTS x (EXISTS y (AND a (AND b c)))) with (EXISTS (x y) (AND a b c)).
+"""
+def compressFormulaTree(T):
+	#collapse all exists nodes starting at T
+	def compressExistsTree(T):
+		if isinstance(T,str) or T[0]!='EXISTS':
+			return T
+		if isinstance(T[1], str):
+			varList = [T[1]]
+		else:
+			varList = T[1]
+		if isinstance(T[2], str) or (isinstance(T[2],list) and T[2][0]!='EXISTS'): #cannot collapse more
+			return T#, varList]
+		#collapse
+		Tchild = compressExistsTree(T[2])
+		if isinstance(Tchild[1], str):
+			moreVars = [Tchild[1]]
+		else:
+			moreVars = Tchild[1]
+		print("it returned", moreVars, ", combining with", varList)
+		print("\t", varList + moreVars)
+		vars = varList + moreVars
+		if len(vars)==1:
+			return ['EXISTS', vars[0], Tchild[2]]
+		else:
+			return ['EXISTS', varList + moreVars, Tchild[2]]
+
+	#collapse all AND nodes starting at T
+	def compressAndTree(T):
+		if isinstance(T, str) or T[0]!='AND':
+			return T
+		children = []
+		for c in T[1:]:
+			if isinstance(c,list) and c[0]=='AND':
+				C = compressAndTree(c)
+				children = children + C[1:]
+			else:
+				children.append(c)
+		return ['AND'] + children
+
+	Tnew = compressExistsTree(compressAndTree(T))
+	if isinstance(Tnew,str):
+		return Tnew
+	if Tnew[0]=='EXISTS' or Tnew[0]=='FORALL':
+		return [Tnew[0], Tnew[1], compressFormulaTree(Tnew[2])]
+	else:
+		return [Tnew[0]] + [compressFormulaTree(t) for t in Tnew[1:]]
+
+
 if __name__=="__main__":
+	T = parseExpression("(EXISTS w (EXISTS (y,z) (EXISTS x (AND a (AND b (EXISTS b (EXISTS c (AND a b (AND c d)))))))))")
+	# T = parseExpression("(AND a g)")
+	print("Original:", T)
+	Tnew = compressFormulaTree(T)
+	print(propStructToSExp(Tnew))
+	exit()
+
 	tptps = sentenceToTPTP("p:DefaultName0 and a girl play in p:DefaultName0's yard and she laughs . p:DefaultName0 is a boy .")
 # 	print("tptps:", tptps)
 	print(tptpsToSexp(tptps))
