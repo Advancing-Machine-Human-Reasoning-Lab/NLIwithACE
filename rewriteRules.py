@@ -304,9 +304,10 @@ def R2(T, snlp=None):
 
 nextIndex = 0
 """Replace past tense verbs (VBD/VBN) with present tense, using pattern.en. (https://www.clips.uantwerpen.be/pages/pattern)
+Uses snlp's dependency parser to determine what the subject of each verb is.
 This is NOT a recursive rule; if calling with applyRule(), use recursive=False.
 """
-def R3(T, snlp=None):
+def R3(T, snlp):
 	#first, convert to a sentence and get the dependency parse
 	sentence = ' '.join(getWordSequence(T))
 	dparse = snlp(sentence)
@@ -347,16 +348,6 @@ def R3(T, snlp=None):
 			return [num, toReturn]
 	return renameLeaves(T)
 
-# def DtoT(D):
-# 	#go through and remove all subject tags from verb words.
-# 	if isinstance(D,str):
-# 		return D
-# 	if D[0][:2] == 'VB':
-# 		if isinstance(D[1], str):
-# 			return D
-# 		else:
-# 			return [D[0], D[1][0]]
-# 	return [D[0]] + [DtoT(c) for c in D[1:]]
 
 """Any occurrences of numbers 1, ..., 10 are replaced with the words `one,' ..., `ten.' Ordinals `1st,' ..., `10th' are replaced with `first,' ..., `tenth.'"""
 def R4(T, snlp=None):
@@ -641,6 +632,48 @@ def S2(Tp, Th):
 					nonHypernyms[v2].add(v1)
 	return [hypernyms, nonHypernyms]
 
+nextIndex = 0
+"""Determine what the subject of the first sentence of Tp and Th are.
+If it is the same noun, and it appears as a predicate in both formulas, then co-instantiate them. 
+Returns the formulas
+"""
+def S3(Tp, Th, fp, fh):
+	#is the sentence in NP-VP form? If so, find out what the noun is on both sides
+	def getNoun(T):
+		if T[0]!='ROOT' or T[1][0]!='S':
+			raise Exception("Attempting to call S3 on an invalid sentence!")
+		if T[1][1][0]!='NP' or T[1][2][0]!='VP':
+			return None
+		NP = T[1][1]
+		#find the rightmost NN
+		def findNN(t):
+			if isinstance(t,str):
+				return None
+			if t[0]=='NN':
+				return t[1]
+			for i in range(1, len(t)):
+				j = len(t)-i
+				val = findNN(t[j])
+				if val!=None:
+					return val
+			return None 
+		return findNN(T)
+
+	np = getNoun(Tp)
+	nh = getNoun(Th)
+	print("Got nouns:", np, nh)
+	if np!=nh or None in [np,nh]:
+		return [fp, fh]
+	n = np
+	#does this appear as a predicate in both formulas? Use regex to search.
+	#TODO
+	varName = 'X'
+	#instantiate varName on both sides, with a new name
+
+
+
+
+
 #S1_old and S2_old: no longer used
 def S1_old(Tp, Th):
 	#find all nouns in Tp, and then in Th
@@ -809,6 +842,11 @@ if __name__=="__main__":
       (NP (DT a) (NN sweater)))
     (. .)))
 	"""
+
+
+	S3(parseConstituency(s), parseConstituency(s), None, None)
+	exit()
+
 	# C = parseConstituency('(S' + ' '.join(['(W ' + w + ')' for w in s.split(' ')]) + ')')
 	C = parseConstituency(s)
 	print(C)
