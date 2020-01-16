@@ -21,6 +21,45 @@ SNLI_LOCATION = "snli/snli_1.0_dev.txt"
 numDivisions = 10 #number of parts to divide the dataset into
 experimentLabel = 'Output' #It will write output to a directory called 'attempts'.
 
+"""Applies syntactic transformation rules to constituency tree T.
+Returns a new constituency parse tree.
+snlp = an object created using stanfordnlp.Pipeline()
+varsToStore = a list of strings, each of which is the name of a variable you want to store in the log.
+"""
+def applySyntacticRules(T, snlp, varsToStore=[]):
+	#Apply rule R9, because it completes sentence fragments and must be done before R8
+	try:
+		[n, T] = applyRule(T, R9, False, snlp=snlp)
+	except Exception as e:
+		print("\n\nMessed up on rule R9, skipping...")
+		print("I was trying to apply the rule to this tree:", T)
+		print("Full details:", str({v:eval(v) for v in varsToStore}))
+		print("Exception", e)
+		traceback.print_exc(file=sys.stdout)
+		# input("Press enter...")	
+	rules = [R1, R4, R5, R6, R7, R8]  
+	#Apply recursive rules
+	for rule in rules:
+		try:
+			[n, T] = applyRule(T, rule, snlp=snlp)
+		except Exception as e:
+			print("Messed up on rule", str(rule), ", skipping...")
+			print("I was trying to apply the rule to this tree:", T)
+			print("Full details:", str({v:eval(v) for v in varsToStore}))
+			print("Exception", e)
+			traceback.print_exc(file=sys.stdout)
+	#Apply nonrecursive rules
+	rules = [R2, R3]  
+	for rule in rules:
+		try:
+			[n, T] = applyRule(T, rule, False, snlp=snlp)
+		except Exception as e:
+			print("Messed up on rule", str(rule), ", skipping...")
+			print("I was trying to apply the rule to this tree:", T)
+			print("Full details:", str({v:eval(v) for v in varsToStore}))
+			print("Exception", e)
+			traceback.print_exc(file=sys.stdout)
+	return T
 
 if __name__=="__main__":
 	with open(SNLI_LOCATION, 'r') as F:
@@ -87,8 +126,6 @@ if __name__=="__main__":
 			allTimes[1] += 1
 		lastTime = currTime
 		
-# 		print("ON LINE:", (i+startAt))
-		
 		try:
 			#######FIRST, Try it without applying any rules
 			correct = line[0]
@@ -122,8 +159,8 @@ if __name__=="__main__":
 			# print("h_raw is:", h_raw)
 			# print("correct is:", correct)
 
-			Tp = parseConstituency(p)
-			Th = parseConstituency(h)
+			Tp = parseConstituency(p, snlp, varsToStore)
+			Th = parseConstituency(h, snlp, varsToStore)
 
 			def assessGuess(guess, correct, Tp, Th, p, h):
 				# print("Correct:", correct, "My guess:", guess)
@@ -147,55 +184,6 @@ if __name__=="__main__":
 				continue
 
 			##########NEXT, APPLY THE SYNTACTIC RULES
-			
-			"""Applies syntactic transformation rules to constituency tree T.
-			"""
-			def applySyntacticRules(T):
-				sentenceHistory = []
-				def updateHistory(currT, step):
-					st = str(currT)
-					if len(sentenceHistory)==0 or st != sentenceHistory[-1][0]:
-						sentenceHistory.append([st, step])
-				updateHistory(T, "start")
-				#Apply rule R9, because it completes sentence fragments and must be done before R8
-				try:
-					[n, T] = applyRule(T, R9, False, snlp=snlp)
-				except Exception as e:
-					print("\n\nMessed up on rule R9, skipping...")
-					print("I was trying to apply the rule to this tree:", T)
-					print("Full details:", str({v:eval(v) for v in varsToStore}))
-					print("Exception", e)
-					traceback.print_exc(file=sys.stdout)
-					# input("Press enter...")	 
-				#Apply recursive rules			
-				rules = [R1, R4, R5, R6, R7, R8] 
-				for rule in rules:
-					try:
-						[n, T] = applyRule(T, rule, snlp=snlp)
-						updateHistory(T, "after " + str(rule))
-					except Exception as e:
-						print("\n\nMessed up on rule", str(rule), ", skipping...")
-						print("I was trying to apply the rule to this tree:", T)
-						print("Full details:", str({v:eval(v) for v in varsToStore}))
-						print("History:")
-						for [s,step] in sentenceHistory:
-							print("\t", step, ":", s)
-						print("Exception", e)
-						traceback.print_exc(file=sys.stdout)
-						# input("Press enter...")
-				#Apply nonrecursive rules
-				rules = [R3, R2] #apply R2 last because it adds extra sentences  
-				for rule in rules:
-					try:
-						[n, T] = applyRule(T, rule, False, snlp=snlp)
-					except Exception as e:
-						print("\n\nMessed up on rule", str(rule), ", skipping...")
-						print("I was trying to apply the rule to this tree:", T)
-						print("Full details:", str({v:eval(v) for v in varsToStore}))
-						print("Exception", e)
-						traceback.print_exc(file=sys.stdout)
-						# input("Press enter...")
-				return T
 			Tp = applySyntacticRules(Tp)
 			Th = applySyntacticRules(Th)
 

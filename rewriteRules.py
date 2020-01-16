@@ -5,15 +5,15 @@ Author: John Licato, licato@usf.edu
 """
 from FOL_resolution import parseExpression, propStructToSExp
 import sys
-from pattern.en import conjugate, pluralize, singularize
-from wordnet_utils import findHypernym, findHypernym_onedir
+# from pattern.en import conjugate, pluralize, singularize
+# from wordnet_utils import findHypernym, findHypernym_onedir
 """To install pattern:
 git clone -b development https://github.com/clips/pattern
 cd pattern
 sudo python3.6 setup.py install
 If it gives sql errors, remove the dependency in setup.py.
 https://www.clips.uantwerpen.be/pages/pattern-en"""
-import stanfordnlp
+# import stanfordnlp
 import traceback
 import copy
 
@@ -645,11 +645,12 @@ def S3(Tp, Th, fp, fh):
 		if T[1][1][0]!='NP' or T[1][2][0]!='VP':
 			return None
 		NP = T[1][1]
+# 		print("np is:", NP)
 		#find the rightmost NN
 		def findNN(t):
 			if isinstance(t,str):
 				return None
-			if t[0]=='NN':
+			if t[0] in ['NN', 'NNS']:
 				return t[1]
 			for i in range(1, len(t)):
 				j = len(t)-i
@@ -657,7 +658,7 @@ def S3(Tp, Th, fp, fh):
 				if val!=None:
 					return val
 			return None 
-		return findNN(T)
+		return findNN(NP)
 
 	np = getNoun(Tp)
 	nh = getNoun(Th)
@@ -669,7 +670,6 @@ def S3(Tp, Th, fp, fh):
 	#TODO
 	varName = 'X'
 	#instantiate varName on both sides, with a new name
-
 
 
 
@@ -833,15 +833,22 @@ if __name__=="__main__":
 	# # print(C)
 	# R2(C)
 
-	s = """(ROOT
-  (NP
-    (NP (JJ Young) (NNS girls))
-    (VP
-      (ADVP (RB gingerly))
-      (VBG knitting)
-      (NP (DT a) (NN sweater)))
+	p = """(ROOT
+  (S
+    (NP (DT A) (NN man))
+    (VP (VBZ reads)
+      (PP (IN on)
+        (NP (DT the) (NN beach))))
     (. .)))
 	"""
+	h = """(ROOT
+  (S
+    (NP (DT A) (NN man))
+    (VP (VBZ reads)
+      (NP (DT a) (NN book)))
+    (. .)))"""
+    fp = 
+	
 
 
 	S3(parseConstituency(s), parseConstituency(s), None, None)
