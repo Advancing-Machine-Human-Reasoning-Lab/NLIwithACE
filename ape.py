@@ -50,8 +50,9 @@ quantified variable which can be replaced. We only check for one form which is c
 	(EXISTS y (AND (Hates 'cat' 'dog' y)))
 		and since this leaves an unnecessary AND, it becomes:
 	(EXISTS y (Hates 'cat' 'dog' 'y'))
+Can either return it in string or nested list form.
 """
-def tptpsToSexp(tptp):
+def tptpsToSexp(tptp, returnList=False):
 	tptps = [t.strip() for t in tptp.split('.\n') if t.strip()!='']
 	for (i,t) in enumerate(tptps):
 		t = t.strip()
@@ -132,9 +133,15 @@ def tptpsToSexp(tptp):
 	if len(newTs)==0:
 		raise Exception("There were no formulae detected in the tptp string! " + tptp)
 	elif len(newTs)==1:
-		return propStructToSExp(newTs[0])
+		if returnList:
+			return newTs[0]
+		else:
+			return propStructToSExp(newTs[0])
 	else:
-		return "(AND " + ' '.join([propStructToSExp(t) for t in newTs]) + ")"
+		if returnList:
+			return ['AND'] + newTs
+		else:
+			return "(AND " + ' '.join([propStructToSExp(t) for t in newTs]) + ")"
 
 
 """Determines if the natural language sentence s2 follows from s1.
@@ -142,17 +149,22 @@ Returns: 0 (neutral), 1 (entailment), 2 (contradiction), or
 -2 - error or failure to parse on both hypothesis and at least one premise sentence
 -1 - error or failure to parse on either hypothesis or at least one premise sentence
 additionalFormulas = additional formulas to add into the resolution prover step. Must be s-expression strings.
+if passingFormulas==True, then s1 and s2 are expected to be s-expression strings rather than NL sentences.
 """
-def sentenceEntailment(s1, s2, maxNumClauses=1500, additionalFormulas=[]):
-	# print("Converting sentences...\n\t", s1, '\n\t', s2)
-	tptps = [sentenceToTPTP(s) for s in [s1,s2]]
-	# print("TPTPS:\n\t", tptps[0], '\n\t', tptps[1])
-	if None in tptps: #at least one of the parsed sentences was unable to parse
-		if tptps[0]==None and tptps[1]==None:
-			return -2
-		else:
-			return -1
-	[parsedPremise, parsedHypothesis] = [tptpsToSexp(t) for t in tptps]
+def sentenceEntailment(s1, s2, passingFormulas=False, maxNumClauses=1500, additionalFormulas=[]):
+	if not passingFormulas:
+		# print("Converting sentences...\n\t", s1, '\n\t', s2)
+		tptps = [sentenceToTPTP(s) for s in [s1,s2]]
+		# print("TPTPS:\n\t", tptps[0], '\n\t', tptps[1])
+		if None in tptps: #at least one of the parsed sentences was unable to parse
+			if tptps[0]==None and tptps[1]==None:
+				return -2
+			else:
+				return -1
+		[parsedPremise, parsedHypothesis] = [tptpsToSexp(t) for t in tptps]
+	else:
+		parsedPremise = s1
+		parsedHypothesis = s2
 	# print("S-exps:\n\t", parsedPremise, '\n\t', parsedHypothesis)
 	#test for entailment
 	[result,trace,clauses] = findContradiction(additionalFormulas + [parsedPremise, "(NOT " + parsedHypothesis + ")"], maxNumClauses, verbose=False, returnTrace=True)

@@ -5,15 +5,16 @@ Author: John Licato, licato@usf.edu
 """
 from FOL_resolution import parseExpression, propStructToSExp
 import sys
-# from pattern.en import conjugate, pluralize, singularize
-# from wordnet_utils import findHypernym, findHypernym_onedir
+import re
+from pattern.en import conjugate, pluralize, singularize
+from wordnet_utils import findHypernym, findHypernym_onedir
 """To install pattern:
 git clone -b development https://github.com/clips/pattern
 cd pattern
 sudo python3.6 setup.py install
 If it gives sql errors, remove the dependency in setup.py.
 https://www.clips.uantwerpen.be/pages/pattern-en"""
-# import stanfordnlp
+import stanfordnlp
 import traceback
 import copy
 
@@ -634,13 +635,16 @@ def S2(Tp, Th):
 
 nextIndex = 0
 """Determine what the subject of the first sentence of Tp and Th are.
+Use the version of Tp and Th, after R9 is applied, but before any others are applied.
 If it is the same noun, and it appears as a predicate in both formulas, then co-instantiate them. 
-Returns the formulas
+Returns the formulas [fp,fh] after they are co-instantiated, or the original formulas if it didn't happen.
 """
 def S3(Tp, Th, fp, fh):
 	#is the sentence in NP-VP form? If so, find out what the noun is on both sides
 	def getNoun(T):
 		if T[0]!='ROOT' or T[1][0]!='S':
+			print("Tp:", Tp)
+			print("Th:", Th)
 			raise Exception("Attempting to call S3 on an invalid sentence!")
 		if T[1][1][0]!='NP' or T[1][2][0]!='VP':
 			return None
@@ -656,22 +660,78 @@ def S3(Tp, Th, fp, fh):
 				j = len(t)-i
 				val = findNN(t[j])
 				if val!=None:
+					if ':' in val:
+						val = val[val.index(':')+1:]
 					return val
 			return None 
 		return findNN(NP)
 
 	np = getNoun(Tp)
 	nh = getNoun(Th)
-	print("Got nouns:", np, nh)
+	# print("Got nouns:", np, nh)
 	if np!=nh or None in [np,nh]:
 		return [fp, fh]
 	n = np
 	#does this appear as a predicate in both formulas? Use regex to search.
-	#TODO
-	varName = 'X'
-	#instantiate varName on both sides, with a new name
+	matches_p = re.findall(r'\(' + n + r' ([\w\']+)\)', propStructToSExp(fp), re.DOTALL)
+	matches_h = re.findall(r'\(' + n + r' ([\w\']+)\)', propStructToSExp(fh), re.DOTALL)
+	# print("Found matches:\n\t", matches_p, '\n\t', matches_h)
+	if len(matches_p)==0 or len(matches_h)==0:
+		return [fp, fh]
+	obj_p = matches_p[0]
+	obj_h = matches_h[0]
 
+	#finds the existential quantifier in formula f that quantifies over var, and instantiates it with object obj.
+	def instantiate(var, obj, f):
+		def replace(var, obj, f):
+			if isinstance(f, str):
+				if f==var:
+					return obj
+				return f
+			if f[0]=='FORALL' or f[0]=='EXISTS':
+				if (isinstance(f[1], str) and f[1]==var) or (isinstance(f[1], list) and var in f[1]):
+					#the variable is no longer in scope!
+					return f
+				return [f[0], f[1], replace(var,obj,f[2])]
+			return [f[0]] + [replace(var,obj,c) for c in f[1:]]
 
+		#is f the node that existentially quantifies over var?
+		if isinstance(f,str):
+			return f
+		if f[0]!='EXISTS':
+			return [f[0]] + [instantiate(c) for c in f[1:]]
+		#assert f[0]=='EXISTS'
+		if (isinstance(f[1], str) and f[1]==var) or (isinstance(f[1], list) and var in f[1]):
+			replacedChild = replace(var, obj, f[2])
+			if isinstance(f[1], str):
+				return replacedChild
+			else:
+				varList = f[1]
+				varList.remove(var)
+				if len(varList)==0:
+					return replacedChild
+				elif len(varList)==1:
+					return ['EXISTS', varList[0], replacedChild]
+				return ['EXISTS', varList, replacedChild]
+		else:
+			return ['EXISTS', f[1], instantiate(var,obj,f[2])]
+
+	#if the predicate appears with quantified variables on both sides, co-instantiate with a new name.
+	if obj_p[0]!="'" and obj_h[0]!="'":
+		# print("type 1")
+		newObjName = 'SubjectOfThisSentence'
+		return [instantiate(obj_p,newObjName,fp), instantiate(obj_h,newObjName,fh)]
+	#if the predicate is not a variable on either side, there's nothing we can do (short of renaming all instances)
+	if obj_p[0]=="'" and obj_h[0]=="'":
+		# print("type 2")
+		return [fp,fh]
+	#if the predicate appears on exactly one side with a quantified variable, then instantiate that with the name on the other side.
+	if obj_p[0]=="'": #premise has the named object, hypothesis has the quantified variable
+		# print("type 3")
+		return[fp, instantiate(obj_h, obj_p, fh)]
+	else: #hypothesis has the named object, premise has the quantified variable
+		# print("type 4")
+		return[instantiate(obj_p, obj_h, fp), fh]
 
 
 #S1_old and S2_old: no longer used
@@ -847,7 +907,7 @@ if __name__=="__main__":
     (VP (VBZ reads)
       (NP (DT a) (NN book)))
     (. .)))"""
-    fp = 
+    # fp = 
 	
 
 

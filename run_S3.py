@@ -7,7 +7,7 @@ See https://github.com/AMHRLab/NLIwithACE/edit/master/README.md for installation
 import stanfordnlp
 from translateFOF import treeToSexp, translateFOF_formula, removeDuplicateQuantifiedVars
 from FOL_resolution import printSExpNice, propStructToSExp, findContradiction, parseExpression
-from ape import sentenceToTPTP, sentenceEntailment
+from ape import *#sentenceToTPTP, sentenceEntailment
 from rewriteRules import *
 import os
 import sys
@@ -43,7 +43,7 @@ def applySyntacticRules(T, snlp, varsToStore=[]):
 		try:
 			[n, T] = applyRule(T, rule, snlp=snlp)
 		except Exception as e:
-			print("Messed up on rule", str(rule), ", skipping...")
+			print("\n\nMessed up on rule", str(rule), ", skipping...")
 			print("I was trying to apply the rule to this tree:", T)
 			print("Full details:", str({v:eval(v) for v in varsToStore}))
 			print("Exception", e)
@@ -54,7 +54,7 @@ def applySyntacticRules(T, snlp, varsToStore=[]):
 		try:
 			[n, T] = applyRule(T, rule, False, snlp=snlp)
 		except Exception as e:
-			print("Messed up on rule", str(rule), ", skipping...")
+			print("\n\nMessed up on rule", str(rule), ", skipping...")
 			print("I was trying to apply the rule to this tree:", T)
 			print("Full details:", str({v:eval(v) for v in varsToStore}))
 			print("Exception", e)
@@ -159,8 +159,8 @@ if __name__=="__main__":
 			# print("h_raw is:", h_raw)
 			# print("correct is:", correct)
 
-			Tp = parseConstituency(p, snlp, varsToStore)
-			Th = parseConstituency(h, snlp, varsToStore)
+			Tp = parseConstituency(p)
+			Th = parseConstituency(h)
 
 			def assessGuess(guess, correct, Tp, Th, p, h):
 				# print("Correct:", correct, "My guess:", guess)
@@ -184,8 +184,8 @@ if __name__=="__main__":
 				continue
 
 			##########NEXT, APPLY THE SYNTACTIC RULES
-			Tp = applySyntacticRules(Tp)
-			Th = applySyntacticRules(Th)
+			Tp = applySyntacticRules(Tp, snlp, varsToStore)
+			Th = applySyntacticRules(Th, snlp, varsToStore)
 
 			# print("\nEntailment between:\n\t", Tp, "\n\t", Th)
 			#use normal entailment. If it guesses ent. or con., then save to file and go to next pair
@@ -209,6 +209,35 @@ if __name__=="__main__":
 			#else if result==0, keep going...
 
 			##########FINALLY, TRY IT WITH THE SEMANTIC RULES
+			#get the parsed formulas. We know they both parse at this point.
+			def parseTree(T):
+				A = treeToACEInput(T)
+				tptp = sentenceToTPTP(A)
+				if tptp==None:
+					return None
+				return tptpsToSexp(tptp, returnList=True)
+			fp = compressFormulaTree(parseTree(Tp))
+			fh = compressFormulaTree(parseTree(Th))
+			if None in [fp,fh]:
+				raise Exception("One of the sentences didn't parse when it should have at this point!")
+
+			#####S3#########
+			Tp_unmodified = R9(parseConstituency(p))[1] #apply R9 to fix sentence fragments, but nothing else
+			Th_unmodified = R9(parseConstituency(h))[1]
+			# print("Original sentences:", '\n\t', treeToACEInput(Tp_unmodified), '\n\t', treeToACEInput(Th_unmodified))
+			# print("Sentences after transforms:", '\n\t', treeToACEInput(Tp), '\n\t', treeToACEInput(Th))
+			# print("Original formulas:", '\n\t', fp, '\n\t', fh)
+			[fp, fh] = S3(Tp_unmodified, Th_unmodified, fp, fh)
+			# print("S3 formulas:", '\n\t', fp, '\n\t', fh)
+			# input("Press enter...")
+			fp = treeToSexp(fp)
+			fh = treeToSexp(fh)
+
+
+
+
+
+
 			# print("About to start S1")
 			#####S1#########
 			[hypernyms, nonHypernyms_n] = S1(Tp, Th)
@@ -248,7 +277,7 @@ if __name__=="__main__":
 			
 			# print("About to start SE")
 			#use normal entailment. If it guesses ent. or con., then save to file and go to next pair
-			result = sentenceEntailment(treeToACEInput(Tp), treeToACEInput(Th), additionalFormulas = extraFormulas)
+			result = sentenceEntailment(fp, fh, passingFormulas=True, additionalFormulas = extraFormulas)
 			# print("RESULT (A3) WAS:", result)
 			if result < 0:
 				stoppedAtStage[2] += 1
@@ -273,7 +302,7 @@ if __name__=="__main__":
 					extraFormulas.append('(FORALL a (FORALL b (IFF (predicate1 a %s b) (NOT (predicate1 a %s b)))))' % (w1, w2))
 					extraFormulas.append('(FORALL a (FORALL b (FORALL c (IFF (predicate2 a %s b c) (NOT (predicate2 a %s b c))))))' % (w1, w2))
 					#extraFormulas.append('(FORALL a (FORALL b (FORALL c (FORALL d (IFF (predicate3 a %s b c d) (NOT (predicate3 a %s b c d)))))))' % (w1, w2))
-			result = sentenceEntailment(treeToACEInput(Tp), treeToACEInput(Th), additionalFormulas = extraFormulas)
+			result = sentenceEntailment(fp, fh, passingFormulas=True, additionalFormulas = extraFormulas)
 			# print("RESULT (A3) WAS:", result)
 			if result < 0:
 				stoppedAtStage[3] += 1
