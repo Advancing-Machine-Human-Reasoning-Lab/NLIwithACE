@@ -187,39 +187,40 @@ if __name__=="__main__":
 			Tp = applySyntacticRules(Tp, snlp, varsToStore)
 			Th = applySyntacticRules(Th, snlp, varsToStore)
 
+			#get the parsed formulas. 
+			def parseTree(T): #T = a constituency parse tree
+				A = treeToACEInput(T)
+				tptp = sentenceToTPTP(A)
+				if tptp==None:
+					return None
+				return tptpsToSexp(tptp, returnList=True)
+
+			fp = compressFormulaTree(parseTree(Tp))
+			fh = compressFormulaTree(parseTree(Th))
+
 			# print("\nEntailment between:\n\t", Tp, "\n\t", Th)
+
+			#TODO: record fp and fh, regardless of whether they parsed
+			with open("attempts/" + experimentLabel + '_parsedSentences_' + str(processId) + ".csv", 'a') as F:
+				F.write('\t'.join([p_raw, h_raw, correct, fp, fh]) + '\n')
+
 			#use normal entailment. If it guesses ent. or con., then save to file and go to next pair
-			result = sentenceEntailment(treeToACEInput(Tp), treeToACEInput(Th))
-			# print("\tResult:", result)
-			if result < 0: #there was an error parsing Tp or Th.
-				# print("ERROR:\n\tTp:", Tp, "\n\tTh:", Th, "\n\tACE Tp:", treeToACEInput(Tp), "\n\tACE Th:", treeToACEInput(Th))
-				# input()
+			if None in [fp,fh]: #at least one sentence failed to parse still
 				stoppedAtStage[1] += 1
 				if result==-1: #at least one sentence parsed successfully
 					coverage += 1
 				with open("attempts/" + experimentLabel + '_' + str(processId) + "_parseFails.txt", 'a') as F:
 					F.write('\t'.join([correct, treeToACEInput(Tp), treeToACEInput(Th), p, h]).strip() + '\n')
 				continue #call it a loss, don't count it
-			else: #both sentences parsed!
-				coverage += 2
-				if result > 0: #did it make a guess of non-neutral?
-					stoppedAtStage[1] += 1
-					assessGuess(guess_values[result], correct, Tp, Th, p, h)
-					continue
-			#else if result==0, keep going...
+			#if we're here, then both sentences now parse!
+			coverage += 2
+			result = sentenceEntailment(fp, fh, passingFormulas=True)#sentenceEntailment(treeToACEInput(Tp), treeToACEInput(Th))
+			if result > 0: #did the reasoner make a guess of non-neutral?
+				stoppedAtStage[1] += 1
+				assessGuess(guess_values[result], correct, Tp, Th, p, h)
+				continue
 
 			##########FINALLY, TRY IT WITH THE SEMANTIC RULES
-			#get the parsed formulas. We know they both parse at this point.
-			def parseTree(T):
-				A = treeToACEInput(T)
-				tptp = sentenceToTPTP(A)
-				if tptp==None:
-					return None
-				return tptpsToSexp(tptp, returnList=True)
-			fp = compressFormulaTree(parseTree(Tp))
-			fh = compressFormulaTree(parseTree(Th))
-			if None in [fp,fh]:
-				raise Exception("One of the sentences didn't parse when it should have at this point!")
 
 			#####S3#########
 			Tp_unmodified = R9(parseConstituency(p))[1] #apply R9 to fix sentence fragments, but nothing else
@@ -232,11 +233,6 @@ if __name__=="__main__":
 			# input("Press enter...")
 			fp = treeToSexp(fp)
 			fh = treeToSexp(fh)
-
-
-
-
-
 
 			# print("About to start S1")
 			#####S1#########

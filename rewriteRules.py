@@ -18,6 +18,8 @@ import stanfordnlp
 import traceback
 import copy
 
+coreNlpPort = 9000
+
 #converts a constituency tree formatted as S-expression into a nested list structure.
 def parseConstituency(s):
 	s = s.replace("(. .)", "(PERIOD PERIOD)").replace("(? ?)", "(QUESTIONMARK QUESTIONMARK)").replace("(! !)", "(EXCLAMATION EXCLAMATION)")
@@ -158,10 +160,11 @@ from coref_resolution import * #comment this out if not using R2
 import warnings
 warnings.filterwarnings("ignore") #comment this out if you want to see warnings
 """New version of R2. This uses coreference resolution to find chains of coreferences, and then iteratively remove all pronominals.
-You must make sure that the stanfordnlp server is running at http://localhost:9000.
+You must make sure that the stanfordnlp server is running at http://localhost:9000. (or whatever you chose for "coreNlpPort" above)
 Use the commands (on server, from within stanford nlp directory):
 export CORENLP_HOME=/home/licato/stanfordnlp_resources/stanford-corenlp-full-2018-10-05/stanford-corenlp-full-2018-10-05
 java -mx4g -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer -port 9000 -timeout 15000 -preload coref 
+**If you use a port other than 9000, change it in the above command.
 
 If this keeps outputting the "Starting Server with command..." line, go to (your virtualenv installation)/lib/python3.6/site-packages/stanfordnlp/server/client.py and comment out the print statement on line 118.
 This is NOT a recursive rule; if calling with applyRule(), use recursive=False.
@@ -202,7 +205,7 @@ def R2(T, snlp=None):
 		st = ' '.join([w for w in outputSentence if w!=None])
 		if len(sentenceHistory)==0 or st != sentenceHistory[-1][0]:
 			sentenceHistory.append([st, step])
-	with CoreNLPClient(endpoint="http://localhost:9000") as client:
+	with CoreNLPClient(endpoint="http://localhost:" + str(coreNlpPort)) as client:
 		ann = client.annotate(flatSentence)
 		# print("Passed:", flatSentence, '\n\toutputSentence:', outputSentence)
 		crc = ann.corefChain
@@ -270,7 +273,7 @@ def R2(T, snlp=None):
 		if outputLabels[i]!=None and outputSentence[i]!=None:
 			outputSentence[i] = outputLabels[i] + 'xxjxx' + outputSentence[i]
 	#turn it into a string, then get new constituency parse:
-	with CoreNLPClient(endpoint="http://localhost:9000", annotators=['parse']) as client:
+	with CoreNLPClient(endpoint="http://localhost:" + str(coreNlpPort), annotators=['parse']) as client:
 		text = ' '.join([w for w in outputSentence if w!=None]).replace(':', 'xxjxx').replace(' .', '.')
 		# print("asking to parse:", text)
 		parse = client.annotate(text)

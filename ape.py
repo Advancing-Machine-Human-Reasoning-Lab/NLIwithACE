@@ -200,8 +200,8 @@ def compressFormulaTree(T):
 			moreVars = [Tchild[1]]
 		else:
 			moreVars = Tchild[1]
-		print("it returned", moreVars, ", combining with", varList)
-		print("\t", varList + moreVars)
+		# print("it returned", moreVars, ", combining with", varList)
+		# print("\t", varList + moreVars)
 		vars = varList + moreVars
 		if len(vars)==1:
 			return ['EXISTS', vars[0], Tchild[2]]
