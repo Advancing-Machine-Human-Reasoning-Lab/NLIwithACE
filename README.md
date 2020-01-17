@@ -25,7 +25,7 @@ It will start up a CoreNLPServer that will listen on port 9000. R2() in rewriteR
 
 ## Example Usage
 
-If you want to replicate what we did for the paper, then download the SNLI dataset (https://nlp.stanford.edu/projects/snli/). Update the line in run_S3.py to point to it; we used the dev set because this approach doesn't use a training step. So log in to the server, activate your virtualenv environment, and then start up the CoreNLP server using the java command listed above. Then, on the window you're running the python script on, point Python to the stanfore corenlp folder, using something like this:
+If you want to replicate what we did for the paper, then download the SNLI dataset (https://nlp.stanford.edu/projects/snli/). Update the line in run_S3.py to point to it; we used the dev set because this approach doesn't use a training step. So log in to the server, activate your virtualenv environment, and then start up the CoreNLP server using the java command listed above. Then, on the window you're running the python script on, point Python to the stanford corenlp folder, using something like this:
 
 `export CORENLP_HOME=~/stanfordnlp_resources/stanford-corenlp-full-2018-10-05/stanford-corenlp-full-2018-10-05/`
 
@@ -40,3 +40,5 @@ for i in {0..9}; do
     python -W ignore run_S3.py $i &
 done
 ```
+
+This might give an error because 'attempts' folder does not exist. If that happens, create an empty folder 'attempts' in the directory same as 'run_S3.py'.
