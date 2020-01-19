@@ -2,6 +2,9 @@
 uses a tiered approach.
 
 See https://github.com/AMHRLab/NLIwithACE/edit/master/README.md for installation instructions.
+
+If you divide into 10 parts, you can easily run them in parallel using the following bash script:
+for i in {0..9}; do   python run_S3.py $i & done
 """
 
 import stanfordnlp
@@ -17,7 +20,8 @@ import time
 """Point this to one of the text files that are part of the SNLI dataset. 
 """
 # SNLI_LOCATION = "snli/snli/1.0_dev.txt"
-SNLI_LOCATION = "snli/snli_1.0_dev.txt"
+# SNLI_LOCATION = "snli/snli_1.0_dev.txt"
+SNLI_LOCATION = "snli/snli_1.0_train.txt"
 numDivisions = 10 #number of parts to divide the dataset into
 experimentLabel = 'Output' #It will write output to a directory called 'attempts'.
 
@@ -201,8 +205,10 @@ if __name__=="__main__":
 			# print("\nEntailment between:\n\t", Tp, "\n\t", Th)
 
 			#TODO: record fp and fh, regardless of whether they parsed
-			with open("attempts/" + experimentLabel + '_parsedSentences_' + str(processId) + ".csv", 'a') as F:
-				F.write('\t'.join([p_raw, h_raw, correct, fp, fh]) + '\n')
+			with open("attempts/" + experimentLabel + '_parsedSentences_' + str(processId) + ".tsv", 'a') as F:
+				fp_str = "None" if (fp==None) else propStructToSExp(fp)
+				fh_str = "None" if (fh==None) else propStructToSExp(fh)
+				F.write('\t'.join([p_raw, h_raw, correct, fp_str, fh_str]) + '\n')
 
 			#use normal entailment. If it guesses ent. or con., then save to file and go to next pair
 			if None in [fp,fh]: #at least one sentence failed to parse still

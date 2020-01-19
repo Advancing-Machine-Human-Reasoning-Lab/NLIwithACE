@@ -163,8 +163,8 @@ def sentenceEntailment(s1, s2, passingFormulas=False, maxNumClauses=1500, additi
 				return -1
 		[parsedPremise, parsedHypothesis] = [tptpsToSexp(t) for t in tptps]
 	else:
-		parsedPremise = s1
-		parsedHypothesis = s2
+		parsedPremise = propStructToSExp(s1)
+		parsedHypothesis = propStructToSExp(s2)
 	# print("S-exps:\n\t", parsedPremise, '\n\t', parsedHypothesis)
 	#test for entailment
 	[result,trace,clauses] = findContradiction(additionalFormulas + [parsedPremise, "(NOT " + parsedHypothesis + ")"], maxNumClauses, verbose=False, returnTrace=True)
@@ -178,7 +178,6 @@ def sentenceEntailment(s1, s2, passingFormulas=False, maxNumClauses=1500, additi
 		return 2
 	else:
 		return 0
-
 """
 Compresses a formula to remove multiple nested existential quantifiers and binary ANDs. E.g.,
 it replaces (EXISTS x (EXISTS y (AND a (AND b c)))) with (EXISTS (x y) (AND a b c)).
@@ -186,7 +185,7 @@ it replaces (EXISTS x (EXISTS y (AND a (AND b c)))) with (EXISTS (x y) (AND a b 
 def compressFormulaTree(T):
 	#collapse all exists nodes starting at T
 	def compressExistsTree(T):
-		if isinstance(T,str) or T[0]!='EXISTS':
+		if isinstance(T,str) or T==None or T[0]!='EXISTS':
 			return T
 		if isinstance(T[1], str):
 			varList = [T[1]]
@@ -210,7 +209,7 @@ def compressFormulaTree(T):
 
 	#collapse all AND nodes starting at T
 	def compressAndTree(T):
-		if isinstance(T, str) or T[0]!='AND':
+		if isinstance(T, str) or T==None or T[0]!='AND':
 			return T
 		children = []
 		for c in T[1:]:
@@ -222,7 +221,7 @@ def compressFormulaTree(T):
 		return ['AND'] + children
 
 	Tnew = compressExistsTree(compressAndTree(T))
-	if isinstance(Tnew,str):
+	if isinstance(Tnew,str) or Tnew==None:
 		return Tnew
 	if Tnew[0]=='EXISTS' or Tnew[0]=='FORALL':
 		return [Tnew[0], Tnew[1], compressFormulaTree(Tnew[2])]
