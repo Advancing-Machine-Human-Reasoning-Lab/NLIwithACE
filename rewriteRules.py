@@ -18,7 +18,7 @@ import stanfordnlp
 import traceback
 import copy
 
-coreNlpPort = 9000
+coreNlpPort = 9005
 
 #converts a constituency tree formatted as S-expression into a nested list structure.
 def parseConstituency(s):

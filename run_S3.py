@@ -120,9 +120,15 @@ if __name__=="__main__":
 	lastTime = None
 	allTimes = [0,0] #total, sum
 	# for (i, [correct,p,h]) in enumerate([[correct,p,h]]):
+	with open("attempts/" + experimentLabel + '_parsedSentences_' + str(processId) + ".tsv", 'r') as F:
+		skip = len([l for l in F.readlines() if l.strip()!=''])		
+		if skip>0:
+			print("Process", processId, ": Skipping", skip, "lines")
 	for (i, line) in enumerate(allLines):
 		if line[0]=='-':
 			continue #skip this problem
+		if i<skip:
+			continue
 			
 		currTime = time.time()
 		if lastTime != None:
