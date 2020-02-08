@@ -10,17 +10,19 @@ A project for converting Natural Language Inference problems into Attempto Contr
 ```
 git clone -b development https://github.com/clips/pattern
 cd pattern
-sudo python3.6 setup.py install
+python3 setup.py install
 ```
 Might be a good idea to rename the 'pattern' folder to something else like 'pattern_library', or it seems to confuse the python module importer.
 
-If this last line gives sql errors, open setup.py and look for the sql dependency, and remove it. Then run the above line again.
+If this last line gives sql errors, open setup.py and look for the sql dependency, and remove it. Then run it again.
 
 3. Install SWI-Prolog: https://www.swi-prolog.org/
-4. Download the Attempto parsing engine (https://github.com/Attempto/APE) and install it using the instructions on that page. Make note of the directory into which you download this engine, and edit "ape.py" to point to it.
-5. Download the Clex lexicon, clex_lexicon.pl (https://github.com/Attempto/Clex). Put this file in the same directory as ape.exe.
+4. Download the Attempto parsing engine (https://github.com/Attempto/APE) and install it using the instructions on that page (clone repo, then use `make install`). Test by going into the directory where ape.exe is installed, and running the command `./ape.exe -text "John waits." -solo tptp`. Make note of this directory, and edit "ape.py" to point to it.
+5. Download the Clex lexicon, clex_lexicon.pl from (https://github.com/Attempto/Clex). Put this file in the same directory as ape.exe.
 6. Download the StanfordNLP library (https://stanfordnlp.github.io/stanfordnlp/). Don't forget to do the one-time download using `stanfordnlp.download('en')`, as per the directions on that page.
-7. (Optional) If you are using the latest version of the syntactic rewrite rule R2 in rewriteRules.py, you also need to install the stanford corenlp server. Make sure you download it here (https://stanfordnlp.github.io/CoreNLP/index.html#download). In a separate window, cd to the folder where you have it installed, and type this:
+7. (Optional) If you are using the latest version of the syntactic rewrite rule R2 in rewriteRules.py, you also need to install the stanford corenlp server. Make sure you download it here (https://stanfordnlp.github.io/CoreNLP/index.html#download). The current zip file to download and uncompress is http://nlp.stanford.edu/software/stanford-corenlp-full-2018-10-05.zip but check the website for the most up-to-date version. In a separate window, point the environmental variable to where you unzipped those jar files:
+`export CORENLP_HOME=~/stanfordnlp_resources/stanford-corenlp-full-2018-10-05` (your directory may differ)
+Now cd to that folder where you have the jar files unzipped, and type this:
 `java -mx4g -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer -port 9000 -timeout 15000 -preload coref`
 It will start up a CoreNLPServer that will listen on port 9000. R2() in rewriteRules.py will be communicating with this.
 
@@ -28,7 +30,7 @@ It will start up a CoreNLPServer that will listen on port 9000. R2() in rewriteR
 
 If you want to replicate what we did for the paper, then download the SNLI dataset (https://nlp.stanford.edu/projects/snli/). Update the line in run_S3.py to point to it; we used the dev set because this approach doesn't use a training step. So log in to the server, activate your virtualenv environment, and then start up the CoreNLP server using the java command listed above. Then, on the window you're running the python script on, point Python to the stanford corenlp folder, using something like this:
 
-`export CORENLP_HOME=~/stanfordnlp_resources/stanford-corenlp-full-2018-10-05/stanford-corenlp-full-2018-10-05/`
+`export CORENLP_HOME=~/stanfordnlp_resources/stanford-corenlp-full-2018-10-05`
 
 Then, run using:
 
