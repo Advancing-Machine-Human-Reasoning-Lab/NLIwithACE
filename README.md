@@ -12,11 +12,10 @@ git clone -b development https://github.com/clips/pattern
 cd pattern
 python3 setup.py install
 ```
-Might be a good idea to rename the 'pattern' folder to something else like 'pattern_library', or it seems to confuse the python module importer.
-
 If this last line gives sql errors, open setup.py and look for the sql dependency, and remove it. Then run it again.
+Finally, rename the 'pattern' folder to something else like 'pattern_library', or it seems to confuse the python module importer. Test if it works by opening python and typing: `from pattern.en import conjugate`
 
-3. Install SWI-Prolog: https://www.swi-prolog.org/
+3. Download and install SWI-Prolog: https://www.swi-prolog.org/
 4. Download the Attempto parsing engine (https://github.com/Attempto/APE) and install it using the instructions on that page (clone repo, then use `make install`). Test by going into the directory where ape.exe is installed, and running the command `./ape.exe -text "John waits." -solo tptp`. Make note of this directory, and edit "ape.py" to point to it.
 5. Download the Clex lexicon, clex_lexicon.pl from (https://github.com/Attempto/Clex). Put this file in the same directory as ape.exe.
 6. Download the StanfordNLP library (https://stanfordnlp.github.io/stanfordnlp/). Don't forget to do the one-time download using `stanfordnlp.download('en')`, as per the directions on that page.
@@ -45,3 +44,6 @@ done
 ```
 
 This might give an error because 'attempts' folder does not exist. If that happens, create an empty folder 'attempts' in the directory same as 'run_S3.py'.
+
+If this keeps outputting the "Starting Server with command..." line, go to (your virtualenv installation)/lib/python3.6/site-packages/stanfordnlp/server/client.py and comment out the print statement, usually around line 118, that says: 
+`print(f"Starting server with command: {' '.join(self.start_cmd)}")`
