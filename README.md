@@ -3,6 +3,7 @@ A project for converting Natural Language Inference problems into Attempto Contr
 
 ## Installation
 
+0. [Highly recommended] Install and set up a virtual environment (https://docs.python.org/3/library/venv.html). All instructions listed here should be run while that virtualenv is activated.
 1. First, download our resolution-based prover and TPTP-to-S-expression convertor (https://github.com/AMHRLab/ResolutionProver). Probably easiest to just put them in the same directory as the python files in this repo.
 2. Install pattern.io (https://www.clips.uantwerpen.be/pages/pattern-en). Note that it appears they still haven't updated it to work with Python 3+, so we have to do a bit of a hack:
 
