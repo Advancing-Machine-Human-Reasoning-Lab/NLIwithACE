@@ -9,7 +9,7 @@ import re
 #requires installation of APE: https://github.com/Attempto/APE
 #and swi-prolog: https://www.swi-prolog.org/
 
-APE_dir = "pattern_folder/APE" #directory containing ape.exe and clex_lexicon.pl.
+APE_dir = "APE" #directory containing ape.exe and clex_lexicon.pl.
 
 """Call APE webservice to translate a sentence into TPTP format."""
 def sentenceToTPTP_web(sentence):
