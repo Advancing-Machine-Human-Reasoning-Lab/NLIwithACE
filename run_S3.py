@@ -123,11 +123,11 @@ if __name__=="__main__":
 	with open("attempts/" + experimentLabel + '_parsedSentences_' + str(processId) + ".tsv", 'r') as F:
 		skip = len([l for l in F.readlines() if l.strip()!=''])		
 		if skip>0:
-			print("Process", processId, ": Skipping", skip, "lines")
+			print("Process", processId, ": Skipping", skip+1, "lines")
 	for (i, line) in enumerate(allLines):
 		if line[0]=='-':
 			continue #skip this problem
-		if i<skip:
+		if i<skip+1:
 			continue
 			
 		currTime = time.time()
