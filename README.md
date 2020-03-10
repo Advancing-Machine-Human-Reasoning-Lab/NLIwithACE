@@ -47,3 +47,6 @@ This might give an error because 'attempts' folder does not exist. If that happe
 
 If this keeps outputting the "Starting Server with command..." line, go to (your virtualenv installation)/lib/python3.6/site-packages/stanfordnlp/server/client.py and comment out the print statement, usually around line 118, that says: 
 `print(f"Starting server with command: {' '.join(self.start_cmd)}")`
+
+## Viewing Results
+Run the `results.ipynb` file, each cell of which corresponds to a particular metric. It would be a good idea to go through this file first in order to get a better idea as to the nomenclature of the output files.
