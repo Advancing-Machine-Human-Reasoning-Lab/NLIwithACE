@@ -1,5 +1,5 @@
 # NLIwithACE
-A project for converting Natural Language Inference problems into Attempto Controlled English, and then solving them. Based on paper currently being considered by FLAIRS 2020.
+A project for converting Natural Language Inference problems into Attempto Controlled English, and then solving them. Based on a paper accepted in FLAIRS 2020. https://arxiv.org/abs/2005.02573
 
 ## Installation
 
